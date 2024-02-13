@@ -1,0 +1,8 @@
+*.crt
+*.key
+*.pfx
+*.pyc
+*.swp
+__pycache__
+
+/nats2jetstream.ini
