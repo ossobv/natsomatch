@@ -3,50 +3,52 @@ use std::fs;
 use toml::Value;
 
 
+pub static MISSING_VALUE: &str = "";
+
 #[derive(Debug)]
-struct NatsConfig {
-    server: Option<String>,
-    subject: Option<String>,
+pub struct NatsConfig {
+    pub server: String,
+    pub subject: String,
     pub tls: Option<TlsConfig>,
 }
 
 #[derive(Debug)]
-struct JetStreamConfig {
-    server: Option<String>,
-    name: Option<String>,
-    subjects: Option<String>,
+pub struct JetStreamConfig {
+    pub server: String,
+    pub name: String,
+    pub subjects: String,
     pub tls: Option<TlsConfig>,
 }
 
 #[derive(Debug)]
-struct TlsConfig {
-    server_name: Option<String>,
-    ca_file: Option<String>,
-    cert_file: Option<String>,
-    key_file: Option<String>,
+pub struct TlsConfig {
+    pub server_name: Option<String>,
+    pub ca_file: Option<String>,
+    pub cert_file: Option<String>,
+    pub key_file: Option<String>,
 }
 
 #[derive(Debug)]
 pub struct AppConfig {
-    pub nats: NatsConfig,
-    pub jetstream: JetStreamConfig,
+    pub input: NatsConfig,      // should be more inputs
+    pub sink: JetStreamConfig,  // should be more sinks
 }
 
 
 fn parse_input_config(config: &Value) -> NatsConfig {
     let input_section = &config["input"]["my_nats"];
 
-    let server: Option<String>;
-    let subject: Option<String>;
+    let server: String;
+    let subject: String;
 
     match input_section.get("nats") {
         Some(nats) => {
-            server = nats.get("server").and_then(|value| value.as_str()).map(String::from);
-            subject = nats.get("subject").and_then(|value| value.as_str()).map(String::from);
+            server = nats.get("server").and_then(|v| v.as_str()).unwrap_or(MISSING_VALUE).to_string();
+            subject = nats.get("subject").and_then(|v| v.as_str()).unwrap_or(MISSING_VALUE).to_string();
         },
         None => {
-            server = None;
-            subject = None;
+            server = MISSING_VALUE.to_string();
+            subject = MISSING_VALUE.to_string();
         },
     };
 
@@ -62,21 +64,21 @@ fn parse_input_config(config: &Value) -> NatsConfig {
 fn parse_sink_config(config: &Value) -> JetStreamConfig {
     let sink_section = &config["sink"]["my_jetstream"];
 
-    let server: Option<String>;
-    let name: Option<String>;
-    let subjects: Option<String>;
+    let server: String;
+    let name: String;
+    let subjects: String;
 
     match sink_section.get("jetstream") {
         Some(jetstream) => {
-            server = jetstream.get("server").and_then(|value| value.as_str()).map(String::from);
-            name = jetstream.get("name").and_then(|value| value.as_str()).map(String::from);
+            server = jetstream.get("server").and_then(|v| v.as_str()).unwrap_or(MISSING_VALUE).to_string();
+            name = jetstream.get("name").and_then(|v| v.as_str()).unwrap_or(MISSING_VALUE).to_string();
             // XXX: should this be an array?
-            subjects = jetstream.get("subjects").and_then(|value| value.as_str()).map(String::from);
+            subjects = jetstream.get("subjects").and_then(|v| v.as_str()).unwrap_or(MISSING_VALUE).to_string();
         },
         None => {
-            server = None;
-            name = None;
-            subjects = None;
+            server = MISSING_VALUE.to_string();
+            name = MISSING_VALUE.to_string();
+            subjects = MISSING_VALUE.to_string();
         },
     };
 
@@ -91,10 +93,10 @@ fn parse_sink_config(config: &Value) -> JetStreamConfig {
 }
 
 fn parse_tls_config(tls_section: &Value) -> TlsConfig {
-    let server_name = tls_section["server_name"].as_str().map(String::from);
-    let ca_file = tls_section["ca_file"].as_str().map(String::from);
-    let cert_file = tls_section["cert_file"].as_str().map(String::from);
-    let key_file = tls_section["key_file"].as_str().map(String::from);
+    let server_name = tls_section.get("server_name").and_then(|v| v.as_str()).map(String::from);
+    let ca_file = tls_section.get("ca_file").and_then(|v| v.as_str()).map(String::from);
+    let cert_file = tls_section.get("cert_file").and_then(|v| v.as_str()).map(String::from);
+    let key_file = tls_section.get("key_file").and_then(|v| v.as_str()).map(String::from);
 
     TlsConfig {
         server_name,
@@ -123,8 +125,8 @@ pub fn parse(filename: &str) -> Result<AppConfig, String> {
 
     // Create and return the AppConfig struct
     let app_config = AppConfig {
-        nats: nats_config,
-        jetstream: jetstream_config,
+        input: nats_config,
+        sink: jetstream_config,
     };
 
     Ok(app_config)

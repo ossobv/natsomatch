@@ -4,7 +4,31 @@ use std::result::Result;
 use nats;
 
 mod config_parser;
-use self::config_parser::{AppConfig, parse};
+use self::config_parser::{AppConfig, TlsConfig, parse};
+
+fn connect_nats(name: &str, server: &str, maybe_tls: &Option<TlsConfig>) -> Result<nats::Connection, std::io::Error> {
+    let mut options = nats::Options::new();
+
+    options = options.with_name(name);
+
+    if let Some(tls) = maybe_tls {
+        options = options.tls_required(true);
+        if let Some(_) = &tls.server_name {
+            eprintln!("warning: tls.server_name is not implemented");
+        }
+        if let Some(ca_file) = &tls.ca_file {
+            options = options.add_root_certificate(ca_file);
+        }
+        match (&tls.cert_file, &tls.key_file) {
+            (Some(cert), Some(key)) => {
+                options = options.client_cert(cert, key);
+            },
+            _ => {},
+        }
+    }
+
+    return options.connect(server);
+}
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Collect command-line arguments
@@ -27,40 +51,29 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("Appconfig {app_config:?}");
 
-    let nc_out = nats::Options::new()
-        .with_name("nats2jetstream-rs-sink")
-        .tls_required(true)
-        .add_root_certificate("./nats_ca.crt")
-        .client_cert("./nats_client.crt", "./nats_client.key")
-        .connect("nats://nats.example.com:4222")?;
-        //.connect("nats://10.91.131.89:4222")?;
+    let nc_out = connect_nats(
+        "nats2jetstream-rs-jetstream-sink",
+        &app_config.sink.server,
+        &app_config.sink.tls)?;
 
     let js = nats::jetstream::new(nc_out);
-    js.add_stream("teststream")?; //, ["test1"])?; // <-- brokenness...
+    let res = js.add_stream("teststream")?; //, ["test1"])?; // <-- brokenness...
 
-    println!("Connected to NATS server SINK+JS {:?}", js);
+    println!("Connected to NATS server SINK+JS {:?} res {:?}", &js, &res);
 
-    //let nats_tls = app_config.nats.tls?
-    let nc_in = nats::Options::new()
-        .with_name("nats2jetstream-rs-input")
-        .tls_required(true)
-        .add_root_certificate(app_config.nats.tls.ca_file)
-        .client_cert(app_config.nats.tls.cert_file, app_config.nats.tls.cert_key)
-        .connect("nats://nats.example.com:4222")?;
-        //.connect("nats://10.91.131.89:4222")?;
+    let nc_in = connect_nats(
+        "nats2jetstream-rs-nats-input",
+        &app_config.input.server,
+        &app_config.input.tls)?;
+    let subscription = nc_in.subscribe(&app_config.input.subject)?;
 
-    println!("Connected to NATS server INPUT {:?}", nc_in);
-
-    // Subscribe to a subject
-    let subject = "default.nats.vector";
-    let subscription = nc_in.subscribe(subject)?;
-
-    println!("Subscribed to subject '{}'", subject);
+    println!("Connected to NATS server INPUT+SUB {:?} subject {}", &subscription, &app_config.input.subject);
 
     // Process incoming messages
     while let Some(msg) = subscription.next() {
         let payload = String::from_utf8_lossy(&msg.data);
         println!("Received message: {}", payload);
+        break
     }
 
     Ok(())
