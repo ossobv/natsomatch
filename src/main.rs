@@ -1,7 +1,8 @@
 use std::env;
 use std::result::Result;
+use std::time::{Duration, Instant};
 
-use nats;
+use nats::{self, jetstream};
 
 mod config_parser;
 use self::config_parser::{AppConfig, TlsConfig, parse};
@@ -49,17 +50,29 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         },
     };
 
-    println!("Appconfig {app_config:?}");
+    //println!("Appconfig {app_config:?}");
 
     let nc_out = connect_nats(
         "nats2jetstream-rs-jetstream-sink",
         &app_config.sink.server,
         &app_config.sink.tls)?;
+    let js = jetstream::new(nc_out);
 
-    let js = nats::jetstream::new(nc_out);
-    let res = js.add_stream("teststream")?; //, ["test1"])?; // <-- brokenness...
+    // XXX: move to configparser
+    let js_subjects: Vec<String> = app_config.sink.subjects
+        .split(',').map(|s| s.to_string()).collect();
 
-    println!("Connected to NATS server SINK+JS {:?} res {:?}", &js, &res);
+    let stream_info = js.add_stream(jetstream::StreamConfig {
+        name: app_config.sink.name,
+        //max_bytes: 5 * 1024 * 1024 * 1024,
+        //storage: StorageType::Memory,
+        subjects: js_subjects,
+        ..Default::default()
+    })?;
+
+    println!("Connected to NATS server SINK+JS {:?}", js);
+    println!("- stream info: {:?}", stream_info);
+    println!("");
 
     let nc_in = connect_nats(
         "nats2jetstream-rs-nats-input",
@@ -67,13 +80,58 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         &app_config.input.tls)?;
     let subscription = nc_in.subscribe(&app_config.input.subject)?;
 
-    println!("Connected to NATS server INPUT+SUB {:?} subject {}", &subscription, &app_config.input.subject);
+    println!("Connected to NATS server INPUT+SUB {:?}", nc_in);
+    println!("- subscription ({}): {:?}", app_config.input.subject, subscription);
+    println!("");
 
-    // Process incoming messages
+    let mut stat_items = 0;
+    let mut stat_publish_time = Duration::default();
+    let mut stat_t0 = Instant::now();
+
+    // Read message from NATS-subscription, publish to NATS-JetStream
     while let Some(msg) = subscription.next() {
-        let payload = String::from_utf8_lossy(&msg.data);
-        println!("Received message: {}", payload);
-        break
+        // Handle publish
+        let publish_t0 = Instant::now();
+        let maybe_ack = js.publish(&app_config.sink.subjects, msg.data);
+        let publish_td = publish_t0.elapsed();
+
+        match maybe_ack {
+            Ok(ack) => {
+                // XXX: what is ack.domain?
+                if ack.duplicate {
+                    eprintln!("dupe in jetstream write: {}", ack.sequence);
+                } else {
+                    //eprintln!("published {}", ack.sequence);
+                }
+            },
+            Err(error) => {
+                eprintln!("error in jetstream write: {}", error);
+            },
+        }
+
+        // Handle stats
+        stat_items += 1;
+        stat_publish_time += publish_td;
+
+        let elapsed = stat_t0.elapsed().as_secs();
+        if elapsed >= 10 {
+            let msg_per_sec: f32 = (stat_items as f32) / (elapsed as f32);
+            let pubt_per_msg: f32;
+            if stat_items > 0 {
+                pubt_per_msg = (stat_publish_time.as_millis() as f32) / (stat_items as f32);
+            } else {
+                pubt_per_msg = -1.0;
+            }
+
+            eprintln!(
+                "info: {} items, {} secs, {:.3} msg/sec, {:.3} msec/msg (pub)",
+                stat_items, elapsed, msg_per_sec, pubt_per_msg);
+
+            // Reset counters
+            stat_items = 0;
+            stat_publish_time = Duration::default();
+            stat_t0 = Instant::now();
+        }
     }
 
     Ok(())
