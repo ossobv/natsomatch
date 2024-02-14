@@ -1,38 +1,39 @@
 use std::env;
-use std::io::ErrorKind::TimedOut;
 use std::result::Result;
 use std::time::{Duration, Instant};
 
-use nats::{self, jetstream};
+use async_nats::{self, jetstream};
+use futures::StreamExt; // needed for subscription.next()
 
 mod config_parser;
 use self::config_parser::{AppConfig, TlsConfig, parse};
 
-fn connect_nats(name: &str, server: &str, maybe_tls: &Option<TlsConfig>) -> Result<nats::Connection, std::io::Error> {
-    let mut options = nats::Options::new();
+async fn connect_nats(_name: &str, server: &str, maybe_tls: &Option<TlsConfig>) -> Result<async_nats::Client, async_nats::ConnectError> {
+    let mut options = async_nats::ConnectOptions::new();
 
-    options = options.with_name(name);
+    //options = options.with_name(name);
 
     if let Some(tls) = maybe_tls {
-        options = options.tls_required(true);
+        options = options.require_tls(true);
         if let Some(_) = &tls.server_name {
             eprintln!("warning: tls.server_name is not implemented");
         }
         if let Some(ca_file) = &tls.ca_file {
-            options = options.add_root_certificate(ca_file);
+            options = options.add_root_certificates(ca_file.into());
         }
         match (&tls.cert_file, &tls.key_file) {
             (Some(cert), Some(key)) => {
-                options = options.client_cert(cert, key);
+                options = options.add_client_certificate(cert.into(), key.into());
             },
             _ => {},
         }
     }
 
-    return options.connect(server);
+    return options.connect(server).await;
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Collect command-line arguments
     let args: Vec<String> = env::args().collect();
     if args.len() != 3 || args[1] != "-c" {
@@ -56,20 +57,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let nc_out = connect_nats(
         "nats2jetstream-rs-jetstream-sink",
         &app_config.sink.server,
-        &app_config.sink.tls)?;
+        &app_config.sink.tls).await?;
     let js = jetstream::new(nc_out);
 
     // XXX: move to configparser
     let js_subjects: Vec<String> = app_config.sink.subjects
         .split(',').map(|s| s.to_string()).collect();
 
-    let stream_info = js.add_stream(jetstream::StreamConfig {
+    let stream_info = js.get_or_create_stream(jetstream::stream::Config {
         name: app_config.sink.name,
         //max_bytes: 5 * 1024 * 1024 * 1024,
         //storage: StorageType::Memory,
         subjects: js_subjects,
         ..Default::default()
-    })?;
+    }).await?;
 
     println!("Connected to NATS server SINK+JS {:?}", js);
     println!("- stream info: {:?}", stream_info);
@@ -78,8 +79,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let nc_in = connect_nats(
         "nats2jetstream-rs-nats-input",
         &app_config.input.server,
-        &app_config.input.tls)?;
-    let subscription = nc_in.subscribe(&app_config.input.subject)?;
+        &app_config.input.tls).await?;
+    let mut subscription = nc_in.subscribe(app_config.input.subject.clone()).await?;
 
     println!("Connected to NATS server INPUT+SUB {:?}", nc_in);
     println!("- subscription ({}): {:?}", app_config.input.subject, subscription);
@@ -90,17 +91,27 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut stat_t0 = Instant::now();
 
     // Read message from NATS-subscription, publish to NATS-JetStream
-    let max_timeout = Duration::from_secs(1);
+    let _max_timeout = Duration::from_secs(1);
 
     loop {
-        let maybe_msg = subscription.next_timeout(max_timeout);
+        //let maybe_msg = subscription.next_timeout(max_timeout);
+        let maybe_msg: Result<async_nats::Message, String>;
+        match subscription.next().await {
+            Some(definite_msg) => {
+                maybe_msg = Ok(definite_msg);
+            }
+            None => {
+                maybe_msg = Err("EOF??".to_string());
+            }
+        };
+//        let maybe_msg = Ok(definite_msg);
 
         if let Ok(msg) = maybe_msg {
             // Handle publish
             let publish_t0 = Instant::now();
-            let maybe_ack = js.publish(&app_config.sink.subjects, msg.data);
+            let _maybe_ack = js.publish(app_config.sink.subjects.clone(), msg.payload).await?;
             let publish_td = publish_t0.elapsed();
-
+            /*
             match maybe_ack {
                 Ok(ack) => {
                     // XXX: what is ack.domain?
@@ -114,15 +125,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     eprintln!("error in jetstream write: {}", error);
                 },
             }
+            */
 
             // Handle stats
             stat_items += 1;
             stat_publish_time += publish_td;
         } else if let Err(err) = maybe_msg {
-            if err.kind() != TimedOut {
-                eprintln!("err?? {:?}", err);
-                break
-            }
+            eprintln!("err?? {:?}", err);
+            break
         }
 
         // Show stats

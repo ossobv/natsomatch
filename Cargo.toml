@@ -17,5 +17,7 @@ codegen-units = 1   # Serial build. Slow, but better opt
 #panic = "abort"    # No debug stacktrace awesomeness?
 
 [dependencies]
-nats = "0.24"
+async-nats = "0.33"
+futures = "0.3"
 toml = "0.8"
+tokio = {version = "1.36", features = ["full"]}
