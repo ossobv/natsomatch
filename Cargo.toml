@@ -14,10 +14,11 @@ strip = true        # Automatically strip symbols from the binary
 #opt-level = "z"    # Optimize for size?
 lto = true	    # Enable Link Time Optimization (LTO)
 codegen-units = 1   # Serial build. Slow, but better opt
-#panic = "abort"    # No debug stacktrace awesomeness?
+panic = "abort"    # No debug stacktrace awesomeness?
 
 [dependencies]
 async-nats = "0.33"
+git-version = "0.3"
 futures = "0.3"
 toml = "0.8"
 tokio = {version = "1.36", features = ["full"]}

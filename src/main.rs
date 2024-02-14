@@ -12,6 +12,8 @@ mod config_parser;
 use self::config_parser::{AppConfig, TlsConfig, parse};
 
 
+const GIT_VERSION: &str = git_version::git_version!();
+
 struct Stats {
     t0: Instant,
     pub_count: u64,
@@ -22,15 +24,15 @@ impl std::fmt::Display for Stats {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let elapsed = self.t0.elapsed().as_secs();
         let msg_per_sec: f32 = (self.pub_count as f32) / (elapsed as f32);
-        let ns_per_msg: f32;
+        let us_per_msg: f32;
         if self.pub_count > 0 {
-            ns_per_msg = (self.pub_duration.as_nanos() as f32) / (self.pub_count as f32);
+            us_per_msg = (self.pub_duration.as_micros() as f32) / (self.pub_count as f32);
         } else {
-            ns_per_msg = 0.0;
+            us_per_msg = 0.0;
         }
         write!(
-            f, "{} M in {} s, {:.3} M/s, {:.3} ns/M (pub)",
-            self.pub_count, elapsed, msg_per_sec, ns_per_msg)
+            f, "{}s {}msg {:.3}msg/s {:.3}µs/msg(pub)",
+            elapsed, self.pub_count, msg_per_sec, us_per_msg)
     }
 }
 
@@ -84,6 +86,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Collect command-line arguments
     let args: Vec<String> = env::args().collect();
     if args.len() != 3 || args[1] != "-c" {
+        eprintln!("nats2jetstream {}", GIT_VERSION);
         eprintln!("Usage: {} -c <config-file>", args[0]);
         std::process::exit(1);
     }
