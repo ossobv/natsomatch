@@ -1,12 +1,59 @@
 use std::env;
 use std::result::Result;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use async_nats::{self, jetstream};
 use futures::StreamExt; // needed for subscription.next()
+//use tokio::sync::Mutex as TokioMutex; // only needed if we await inside held locks
+use tokio::time::sleep;
 
 mod config_parser;
 use self::config_parser::{AppConfig, TlsConfig, parse};
+
+
+struct Stats {
+    t0: Instant,
+    pub_count: u64,
+    pub_duration: Duration,
+}
+
+impl std::fmt::Display for Stats {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let elapsed = self.t0.elapsed().as_secs();
+        let msg_per_sec: f32 = (self.pub_count as f32) / (elapsed as f32);
+        let ns_per_msg: f32;
+        if self.pub_count > 0 {
+            ns_per_msg = (self.pub_duration.as_nanos() as f32) / (self.pub_count as f32);
+        } else {
+            ns_per_msg = 0.0;
+        }
+        write!(
+            f, "{} M in {} s, {:.3} M/s, {:.3} ns/M (pub)",
+            self.pub_count, elapsed, msg_per_sec, ns_per_msg)
+    }
+}
+
+impl Stats {
+    fn default() -> Stats {
+        Stats{t0: Instant::now(), pub_count: 0, pub_duration: Duration::default()}
+    }
+
+    fn reset(&mut self) -> &Stats {
+        // FIXME: dupe code with default()?
+        self.t0 = Instant::now();
+        self.pub_count = 0;
+        self.pub_duration = Duration::default();
+        self
+    }
+
+    fn inc_pub(&mut self, pub_duration: Duration) -> &Stats {
+        self.pub_count += 1;
+        self.pub_duration += pub_duration;
+        self
+    }
+}
+
 
 async fn connect_nats(_name: &str, server: &str, maybe_tls: &Option<TlsConfig>) -> Result<async_nats::Client, async_nats::ConnectError> {
     let mut options = async_nats::ConnectOptions::new();
@@ -86,76 +133,56 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("- subscription ({}): {:?}", app_config.input.subject, subscription);
     println!("");
 
-    let mut stat_items = 0;
-    let mut stat_publish_time = Duration::default();
-    let mut stat_t0 = Instant::now();
-
     // Read message from NATS-subscription, publish to NATS-JetStream
     let _max_timeout = Duration::from_secs(1);
 
+    // Stats where we record how we're doing
+    let period_stats_1 = Arc::new(Mutex::new(Stats::default()));
+    let period_stats_2 = period_stats_1.clone();
+    let forever_stats_1 = Arc::new(Mutex::new(Stats::default()));
+    let forever_stats_2 = forever_stats_1.clone();
+
+    // Start a background task for periodic updates
+    let stats_task = tokio::spawn(async move {
+        loop {
+            // Async sleep for 10 seconds
+            sleep(Duration::from_secs(10)).await;
+
+            // Get access to the stats and go
+            let mut period_stats = period_stats_1.lock().unwrap();
+            let forever_stats = forever_stats_1.lock().unwrap();
+            eprintln!("info: {} [periodic], {} [forever]", period_stats, forever_stats);
+            drop(forever_stats);
+            period_stats.reset();
+            drop(period_stats);
+        }
+    });
+
+    // Start the main task
     loop {
-        //let maybe_msg = subscription.next_timeout(max_timeout);
-        let maybe_msg: Result<async_nats::Message, String>;
         match subscription.next().await {
-            Some(definite_msg) => {
-                maybe_msg = Ok(definite_msg);
+            Some(msg) => {
+                let pub_t0 = Instant::now();
+                let _maybe_ack = js.publish(app_config.sink.subjects.clone(), msg.payload).await?;
+                let pub_td = pub_t0.elapsed();
+
+                let mut period_stats = period_stats_2.lock().unwrap();
+                period_stats.inc_pub(pub_td);
+                drop(period_stats);
+
+                let mut forever_stats = forever_stats_2.lock().unwrap();
+                forever_stats.inc_pub(pub_td);
+                drop(forever_stats);
             }
             None => {
-                maybe_msg = Err("EOF??".to_string());
+                eprintln!("err??");
+                break
             }
-        };
-//        let maybe_msg = Ok(definite_msg);
-
-        if let Ok(msg) = maybe_msg {
-            // Handle publish
-            let publish_t0 = Instant::now();
-            let _maybe_ack = js.publish(app_config.sink.subjects.clone(), msg.payload).await?;
-            let publish_td = publish_t0.elapsed();
-            /*
-            match maybe_ack {
-                Ok(ack) => {
-                    // XXX: what is ack.domain?
-                    if ack.duplicate {
-                        eprintln!("dupe in jetstream write: {}", ack.sequence);
-                    } else {
-                        //eprintln!("published {}", ack.sequence);
-                    }
-                },
-                Err(error) => {
-                    eprintln!("error in jetstream write: {}", error);
-                },
-            }
-            */
-
-            // Handle stats
-            stat_items += 1;
-            stat_publish_time += publish_td;
-        } else if let Err(err) = maybe_msg {
-            eprintln!("err?? {:?}", err);
-            break
-        }
-
-        // Show stats
-        let elapsed = stat_t0.elapsed().as_secs();
-        if elapsed >= 10 {
-            let msg_per_sec: f32 = (stat_items as f32) / (elapsed as f32);
-            let pubt_per_msg: f32;
-            if stat_items > 0 {
-                pubt_per_msg = (stat_publish_time.as_millis() as f32) / (stat_items as f32);
-            } else {
-                pubt_per_msg = 0.0;
-            }
-
-            eprintln!(
-                "info: {} items, {} secs, {:.3} msg/sec, {:.3} msec/msg (pub)",
-                stat_items, elapsed, msg_per_sec, pubt_per_msg);
-
-            // Reset counters
-            stat_items = 0;
-            stat_publish_time = Duration::default();
-            stat_t0 = Instant::now();
         }
     }
+
+    // XXX: does this work? is this needed?
+    stats_task.abort();
 
     Ok(())
 }
