@@ -57,30 +57,29 @@ class Stats:
     def __init__(self, name):
         self.name = name
         self.t0 = time()
-        self.pipe_messages = 0
-        self.pipe_duration = 0.0
+        self.count = 0
+        self.duration = 0.0
 
-    def add_pipe_duration(self, tm):
-        self.pipe_duration += tm
-        self.pipe_messages += 1
+    def inc(self, tm):
+        self.duration += tm
+        self.count += 1
 
     def reset(self):
         self.t0 = time()
-        self.pipe_messages = 0
-        self.pipe_duration = 0.0
+        self.count = 0
+        self.duration = 0.0
 
     def __repr__(self):
-        if self.pipe_messages:
-            uspmsg = (self.pipe_duration * 1_000 / self.pipe_messages)
-        else:
-            uspmsg = 0.0
-
         name = self.name
-        msgs = self.pipe_messages
-        msgps = msgs / (time() - self.t0)
+        msgs = self.count
+        msg_per_sec = msgs / (time() - self.t0)
+        if self.count:
+            ms_per_msg = (self.duration * 1_000 / self.count)
+        else:
+            ms_per_msg = 0.0
         return (
-            f'<Stats: {name} {msgs} msgs ({uspmsg:.3f} ms/msg, '
-            f'{msgps:.3f} msg/s)>')
+            f'<Stats: {name} {msgs} msgs '
+            f'({msg_per_sec:.3f} msg/s, {ms_per_msg:.3f} ms/msg)>')
 
     def __str__(self):
         return repr(self)
@@ -289,8 +288,7 @@ async def _run_input_nats(conf, dst_fd, stats):
             sblen += 2
             t0 = time()
             outlen = write(dst_fd, structured_body)
-            td = time() - t0
-            stats.add_pipe_duration(td)
+            stats.inc(time() - t0)  # one message, time to write to pipe
             assert outlen == sblen, (sblen, outlen)
     finally:
         await nc.drain()
@@ -328,7 +326,6 @@ async def _run_sink_jetstream(conf, src_fd, stats):
     try:
         while True:
             # Read message from other end of the pipe.
-            t0 = time()
             sblen = read(src_fd, 2)
             if not sblen:  # closed pipe
                 break
@@ -336,15 +333,15 @@ async def _run_sink_jetstream(conf, src_fd, stats):
             assert len(sblen) == 2, sblen
             sblen = sblen[0] << 8 | sblen[1]
             structured_body = read(src_fd, sblen)
-            td = time() - t0
-            stats.add_pipe_duration(td)
             inlen = len(structured_body)
             assert inlen == sblen, (sblen, inlen)
 
             try:
+                t0 = time()
                 resp = await js.publish(
                     conf.jetstream__subjects[0],
                     structured_body, headers=headers)
+                stats.inc(time() - t0)  # one message, time for jetstream pub
                 if 0:
                     resp
             except Exception:
@@ -373,7 +370,7 @@ def handle_status(signum, frame):
         except OSError:
             pass
 
-    alarm(60)  # re-arm
+    alarm(10)  # re-arm
 
 
 def main():
@@ -435,7 +432,7 @@ def main():
     global_pids = (consumer_pid, producer_pid)
     signal(SIGALRM, handle_status)
     signal(SIGQUIT, handle_status)
-    alarm(60)
+    alarm(10)
 
     print(f'nats2jetstream (pids=[{producer_pid} -> {consumer_pid}])')
     try:

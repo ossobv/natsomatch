@@ -1,4 +1,5 @@
 use std::env;
+use std::io::ErrorKind::TimedOut;
 use std::result::Result;
 use std::time::{Duration, Instant};
 
@@ -89,30 +90,42 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut stat_t0 = Instant::now();
 
     // Read message from NATS-subscription, publish to NATS-JetStream
-    while let Some(msg) = subscription.next() {
-        // Handle publish
-        let publish_t0 = Instant::now();
-        let maybe_ack = js.publish(&app_config.sink.subjects, msg.data);
-        let publish_td = publish_t0.elapsed();
+    let max_timeout = Duration::from_secs(1);
 
-        match maybe_ack {
-            Ok(ack) => {
-                // XXX: what is ack.domain?
-                if ack.duplicate {
-                    eprintln!("dupe in jetstream write: {}", ack.sequence);
-                } else {
-                    //eprintln!("published {}", ack.sequence);
-                }
-            },
-            Err(error) => {
-                eprintln!("error in jetstream write: {}", error);
-            },
+    loop {
+        let maybe_msg = subscription.next_timeout(max_timeout);
+
+        if let Ok(msg) = maybe_msg {
+            // Handle publish
+            let publish_t0 = Instant::now();
+            let maybe_ack = js.publish(&app_config.sink.subjects, msg.data);
+            let publish_td = publish_t0.elapsed();
+
+            match maybe_ack {
+                Ok(ack) => {
+                    // XXX: what is ack.domain?
+                    if ack.duplicate {
+                        eprintln!("dupe in jetstream write: {}", ack.sequence);
+                    } else {
+                        //eprintln!("published {}", ack.sequence);
+                    }
+                },
+                Err(error) => {
+                    eprintln!("error in jetstream write: {}", error);
+                },
+            }
+
+            // Handle stats
+            stat_items += 1;
+            stat_publish_time += publish_td;
+        } else if let Err(err) = maybe_msg {
+            if err.kind() != TimedOut {
+                eprintln!("err?? {:?}", err);
+                break
+            }
         }
 
-        // Handle stats
-        stat_items += 1;
-        stat_publish_time += publish_td;
-
+        // Show stats
         let elapsed = stat_t0.elapsed().as_secs();
         if elapsed >= 10 {
             let msg_per_sec: f32 = (stat_items as f32) / (elapsed as f32);
@@ -120,7 +133,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             if stat_items > 0 {
                 pubt_per_msg = (stat_publish_time.as_millis() as f32) / (stat_items as f32);
             } else {
-                pubt_per_msg = -1.0;
+                pubt_per_msg = 0.0;
             }
 
             eprintln!(
