@@ -16,20 +16,19 @@ TODO
 ☐  Create systemd unitfile or K8S image for continuous running.
 
 ☐  Check and configure output JetStream parameters:
-   ``{"max_bytes": -1, "max_messages": -1, "discard": "Old",
-    "max_age": 0, "max_message_size": -1, "no_ack": false}``
-   See more here: https://docs.nats.io/nats-concepts/jetstream/streams
 
-☐  Discuss whether we want to do anything with JetStream subjects
-   at this point. Makes sense to populate with tenants maybe.
+- ``{"max_bytes": -1, "max_messages": -1, "discard": "Old", "max_age": 0, "max_message_size": -1, "no_ack": false}``
+- See more here: https://docs.nats.io/nats-concepts/jetstream/streams
 
-☐  Consider whether we want to do any parsing so we can do filtering or
-   better subject setting.
+☐  Discuss whether we want to do anything with JetStream subjects at this point. Makes sense to populate with tenants maybe.
+
+☐  Consider whether we want to do any parsing so we can do filtering or better subject setting.
 
 ☐  Naming:
-   - input subject suggestion: "NS.log.vector-in"
-   - jetstream name suggestion: "NS.log.bulk"
-   - jetstream subjects suggestion: "bulk.tenant.TENANT"
+
+- input subject suggestion: "NS.log.vector-in"
+- jetstream name suggestion: "NS.log.bulk"
+- jetstream subjects suggestion: "bulk.tenant.TENANT"
 
 
 -------------------
