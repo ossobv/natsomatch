@@ -7,25 +7,25 @@ pub static MISSING_VALUE: &str = "";
 
 #[derive(Debug)]
 pub struct NatsConfig {
-    pub server: String,
-    pub subject: String,
+    pub server: Box<str>,
+    pub subject: Box<str>,
     pub tls: Option<TlsConfig>,
 }
 
 #[derive(Debug)]
 pub struct JetStreamConfig {
-    pub server: String,
-    pub name: String,
-    pub subjects: String,
+    pub server: Box<str>,
+    pub name: Box<str>,
+    pub subjects: Box<str>,
     pub tls: Option<TlsConfig>,
 }
 
 #[derive(Debug)]
 pub struct TlsConfig {
-    pub server_name: Option<String>,
-    pub ca_file: Option<String>,
-    pub cert_file: Option<String>,
-    pub key_file: Option<String>,
+    pub server_name: Option<Box<str>>,
+    pub ca_file: Option<Box<str>>,
+    pub cert_file: Option<Box<str>>,
+    pub key_file: Option<Box<str>>,
 }
 
 #[derive(Debug)]
@@ -35,20 +35,25 @@ pub struct AppConfig {
 }
 
 
+fn as_box_str(input: &str) -> Box<str> {
+    //String::from(input).into()            // Which of these
+    input.to_string().into_boxed_str()      // two is better?
+}
+
 fn parse_input_config(config: &Value) -> NatsConfig {
     let input_section = &config["input"]["my_nats"];
 
-    let server: String;
-    let subject: String;
+    let server: Box<str>;
+    let subject: Box<str>;
 
     match input_section.get("nats") {
         Some(nats) => {
-            server = nats.get("server").and_then(|v| v.as_str()).unwrap_or(MISSING_VALUE).to_string();
-            subject = nats.get("subject").and_then(|v| v.as_str()).unwrap_or(MISSING_VALUE).to_string();
+            server = nats.get("server").and_then(|v| v.as_str()).unwrap_or(MISSING_VALUE).into();
+            subject = nats.get("subject").and_then(|v| v.as_str()).unwrap_or(MISSING_VALUE).into();
         },
         None => {
-            server = MISSING_VALUE.to_string();
-            subject = MISSING_VALUE.to_string();
+            server = MISSING_VALUE.into();
+            subject = MISSING_VALUE.into();
         },
     };
 
@@ -64,21 +69,21 @@ fn parse_input_config(config: &Value) -> NatsConfig {
 fn parse_sink_config(config: &Value) -> JetStreamConfig {
     let sink_section = &config["sink"]["my_jetstream"];
 
-    let server: String;
-    let name: String;
-    let subjects: String;
+    let server: Box<str>;
+    let name: Box<str>;
+    let subjects: Box<str>;
 
     match sink_section.get("jetstream") {
         Some(jetstream) => {
-            server = jetstream.get("server").and_then(|v| v.as_str()).unwrap_or(MISSING_VALUE).to_string();
-            name = jetstream.get("name").and_then(|v| v.as_str()).unwrap_or(MISSING_VALUE).to_string();
+            server = jetstream.get("server").and_then(|v| v.as_str()).unwrap_or(MISSING_VALUE).into();
+            name = jetstream.get("name").and_then(|v| v.as_str()).unwrap_or(MISSING_VALUE).into();
             // XXX: should this be an array?
-            subjects = jetstream.get("subjects").and_then(|v| v.as_str()).unwrap_or(MISSING_VALUE).to_string();
+            subjects = jetstream.get("subjects").and_then(|v| v.as_str()).unwrap_or(MISSING_VALUE).into();
         },
         None => {
-            server = MISSING_VALUE.to_string();
-            name = MISSING_VALUE.to_string();
-            subjects = MISSING_VALUE.to_string();
+            server = MISSING_VALUE.into();
+            name = MISSING_VALUE.into();
+            subjects = MISSING_VALUE.into();
         },
     };
 
@@ -93,10 +98,10 @@ fn parse_sink_config(config: &Value) -> JetStreamConfig {
 }
 
 fn parse_tls_config(tls_section: &Value) -> TlsConfig {
-    let server_name = tls_section.get("server_name").and_then(|v| v.as_str()).map(String::from);
-    let ca_file = tls_section.get("ca_file").and_then(|v| v.as_str()).map(String::from);
-    let cert_file = tls_section.get("cert_file").and_then(|v| v.as_str()).map(String::from);
-    let key_file = tls_section.get("key_file").and_then(|v| v.as_str()).map(String::from);
+    let server_name = tls_section.get("server_name").and_then(|v| v.as_str()).map(as_box_str);
+    let ca_file = tls_section.get("ca_file").and_then(|v| v.as_str()).map(as_box_str);
+    let cert_file = tls_section.get("cert_file").and_then(|v| v.as_str()).map(as_box_str);
+    let key_file = tls_section.get("key_file").and_then(|v| v.as_str()).map(as_box_str);
 
     TlsConfig {
         server_name,

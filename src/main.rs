@@ -1,5 +1,6 @@
 use std::env;
 use std::result::Result;
+use std::str::FromStr; // implements from_str on PathBuf
 use std::sync::{Arc, Mutex}; // TokioMutex only needed if we await with lock held
 use std::time::{Duration, Instant};
 
@@ -13,6 +14,32 @@ use self::config_parser::{AppConfig, TlsConfig, parse};
 
 const GIT_VERSION: &str = git_version::git_version!();
 const STATS_EVERY: u64 = 60;  // show stats every N seconds
+
+
+///
+/// There is no conversion from Box<str> to PathBuf. Create it with to_path_buf().
+///
+trait ConvertToPathBuf {
+    fn to_path_buf(&self) -> std::path::PathBuf;
+}
+impl ConvertToPathBuf for Box<str> {
+    fn to_path_buf(&self) -> std::path::PathBuf {
+        std::path::PathBuf::from_str(self).expect("failure converting to std::path::PathBuf")
+    }
+}
+
+///
+/// There is no conversion from Box<str> to Subject. Create it with to_subject().
+///
+pub trait ToSubject {
+    fn to_subject(&self) -> async_nats::subject::Subject;
+}
+impl ToSubject for Box<str> {
+    fn to_subject(&self) -> async_nats::subject::Subject {
+        let s: String = (*self).clone().into();
+        async_nats::subject::Subject::from(s)
+    }
+}
 
 
 struct Stats {
@@ -67,11 +94,11 @@ async fn connect_nats(_name: &str, server: &str, maybe_tls: &Option<TlsConfig>) 
             eprintln!("warning: tls.server_name is not implemented");
         }
         if let Some(ca_file) = &tls.ca_file {
-            options = options.add_root_certificates(ca_file.into());
+            options = options.add_root_certificates(ca_file.to_path_buf());
         }
         match (&tls.cert_file, &tls.key_file) {
             (Some(cert), Some(key)) => {
-                options = options.add_client_certificate(cert.into(), key.into());
+                options = options.add_client_certificate(cert.to_path_buf(), key.to_path_buf());
             },
             _ => {},
         }
@@ -115,7 +142,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .split(',').map(|s| s.to_string()).collect();
 
     let stream_info = js.get_or_create_stream(jetstream::stream::Config {
-        name: app_config.sink.name,
+        name: app_config.sink.name.to_string(),
         //max_bytes: 5 * 1024 * 1024 * 1024,
         //storage: StorageType::Memory,
         subjects: js_subjects,
@@ -130,7 +157,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "nats2jetstream-rs-nats-input",
         &app_config.input.server,
         &app_config.input.tls).await?;
-    let mut subscription = nc_in.subscribe(app_config.input.subject.clone()).await?;
+    let mut subscription = nc_in.subscribe(app_config.input.subject.to_subject()).await?;
 
     println!("Connected to NATS server INPUT+SUB {:?}", nc_in);
     println!("- subscription ({}): {:?}", app_config.input.subject, subscription);
@@ -164,10 +191,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Start the main task
     loop {
+        let subjects = app_config.sink.subjects.to_subject();
         match subscription.next().await {
             Some(msg) => {
                 let pub_t0 = Instant::now();
-                let _maybe_ack = js.publish(app_config.sink.subjects.clone(), msg.payload).await?;
+                let _maybe_ack = js.publish(subjects, msg.payload).await?;
                 let pub_td = pub_t0.elapsed();
 
                 let mut period_stats = period_stats_2.lock().unwrap();
