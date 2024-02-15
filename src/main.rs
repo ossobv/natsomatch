@@ -1,11 +1,10 @@
 use std::env;
 use std::result::Result;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex}; // TokioMutex only needed if we await with lock held
 use std::time::{Duration, Instant};
 
 use async_nats::{self, jetstream};
 use futures::StreamExt; // needed for subscription.next()
-//use tokio::sync::Mutex as TokioMutex; // only needed if we await inside held locks
 use tokio::time::sleep;
 
 mod config_parser;
@@ -13,27 +12,13 @@ use self::config_parser::{AppConfig, TlsConfig, parse};
 
 
 const GIT_VERSION: &str = git_version::git_version!();
+const STATS_EVERY: u64 = 60;  // show stats every N seconds
+
 
 struct Stats {
     t0: Instant,
     pub_count: u64,
     pub_duration: Duration,
-}
-
-impl std::fmt::Display for Stats {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let elapsed = self.t0.elapsed().as_secs();
-        let msg_per_sec: f32 = (self.pub_count as f32) / (elapsed as f32);
-        let us_per_msg: f32;
-        if self.pub_count > 0 {
-            us_per_msg = (self.pub_duration.as_micros() as f32) / (self.pub_count as f32);
-        } else {
-            us_per_msg = 0.0;
-        }
-        write!(
-            f, "{}s {}msg {:.3}msg/s {:.3}µs/msg(pub)",
-            elapsed, self.pub_count, msg_per_sec, us_per_msg)
-    }
 }
 
 impl Stats {
@@ -56,11 +41,25 @@ impl Stats {
     }
 }
 
+impl std::fmt::Display for Stats {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let elapsed = self.t0.elapsed().as_secs();
+        let msg_per_sec: f32 = (self.pub_count as f32) / (elapsed as f32);
+        let us_per_msg: f32;
+        if self.pub_count > 0 {
+            us_per_msg = (self.pub_duration.as_micros() as f32) / (self.pub_count as f32);
+        } else {
+            us_per_msg = 0.0;
+        }
+        write!(
+            f, "{}s {}msg {:.3}msg/s {:.3}µs/msg(pub)",
+            elapsed, self.pub_count, msg_per_sec, us_per_msg)
+    }
+}
+
 
 async fn connect_nats(_name: &str, server: &str, maybe_tls: &Option<TlsConfig>) -> Result<async_nats::Client, async_nats::ConnectError> {
     let mut options = async_nats::ConnectOptions::new();
-
-    //options = options.with_name(name);
 
     if let Some(tls) = maybe_tls {
         options = options.require_tls(true);
@@ -80,6 +79,7 @@ async fn connect_nats(_name: &str, server: &str, maybe_tls: &Option<TlsConfig>) 
 
     return options.connect(server).await;
 }
+
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -147,14 +147,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Start a background task for periodic updates
     let stats_task = tokio::spawn(async move {
+        let sleep_time = Duration::from_secs(STATS_EVERY);
         loop {
-            // Async sleep for 10 seconds
-            sleep(Duration::from_secs(10)).await;
+            // Async sleep for N seconds
+            sleep(sleep_time).await;
 
             // Get access to the stats and go
             let mut period_stats = period_stats_1.lock().unwrap();
             let forever_stats = forever_stats_1.lock().unwrap();
-            eprintln!("info: {} [periodic], {} [forever]", period_stats, forever_stats);
+            eprintln!("info: {} [total], {} [last]", forever_stats, period_stats);
             drop(forever_stats);
             period_stats.reset();
             drop(period_stats);
