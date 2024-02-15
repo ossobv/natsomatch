@@ -12,5 +12,9 @@
 *.swp
 __pycache__
 
+# Do not gitignore Cargo.lock (for now)
+# https://doc.rust-lang.org/cargo/guide/cargo-toml-vs-cargo-lock.html
+#/Cargo.lock
+
 # Output directories
 /target
