@@ -87,3 +87,42 @@ Configuration for the Python PoC:
     ; Client certificate
     tls.cert_file = ./nats_client.crt
     tls.key_file = ./nats_client.key
+
+
+-----------------------
+Binary version and SBOM
+-----------------------
+
+The ``git describe`` version is stored and shown on bad arguments:
+
+.. code-block:: console
+
+    $ ./target/release/nats2jetstream -v
+    nats2jetstream v0.1.0
+    Usage: ./target/release/nats2jetstream -c <config-file>
+
+The built binary (if built using ``cargo auditable build``) includes a
+*Software Bill of Materials* (SBOM):
+
+.. code-block:: console
+
+    $ objcopy --dump-section .dep-v0=/dev/stdout target/release/nats2jetstream |
+        python3 -c 'import zlib,sys;print(zlib.decompress(sys.stdin.buffer.read()).decode("utf-8"))' |
+        jq .
+    {
+      "packages": [
+        {
+          "name": "aho-corasick",
+          "version": "1.1.2",
+          "source": "crates.io",
+          "dependencies": [
+            45
+          ]
+        },
+        {
+          "name": "async-nats",
+          "version": "0.33.0",
+          "source": "crates.io",
+          "dependencies": [
+            3,
+    ...
