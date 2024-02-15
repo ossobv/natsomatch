@@ -1,9 +1,16 @@
+# User configuration files
+/nats2jetstream.ini
+/nats2jetstream.toml
+
+# User other files
 *.crt
 *.key
 *.pfx
+
+# Output files / temp files
 *.pyc
 *.swp
 __pycache__
 
-/nats2jetstream.ini
-/nats2jetstream.toml
+# Output directories
+/target
