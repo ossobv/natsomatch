@@ -20,15 +20,15 @@ TODO
 - ``{"max_bytes": -1, "max_messages": -1, "discard": "Old", "max_age": 0, "max_message_size": -1, "no_ack": false}``
 - See more here: https://docs.nats.io/nats-concepts/jetstream/streams
 
-☐  Discuss whether we want to do anything with JetStream subjects at this point. Makes sense to populate with tenants maybe.
+☐  Discuss whether we want to do anything with JetStream subjects at this point. Makes sense to populate with sections maybe.
 
 ☐  Consider whether we want to do any parsing so we can do filtering or better subject setting.
 
 ☐  Naming:
 
 - input subject suggestion: "NS.log.vector-in"
-- jetstream name suggestion: "NS.log.bulk"
-- jetstream subjects suggestion: "bulk.tenant.TENANT"
+- jetstream name suggestion: "bulk"
+- jetstream subjects suggestion: "bulk.section.{section}"
 
 
 -------------------
@@ -42,7 +42,7 @@ Configuration for the Rust version:
     [input.my_nats]
     # Input source
     nats.server = 'tls://10.20.30.40:4222'
-    nats.subject = 'default.nats.vector'
+    nats.subject = 'NS.log.vector-in'
     # Server certificate validation (tls.server_name is not working)
     tls.server_name = 'nats.local'
     tls.ca_file = './nats_ca.crt'
@@ -53,8 +53,8 @@ Configuration for the Rust version:
     [sink.my_jetstream]
     # Output target
     jetstream.server = 'tls://nats.example.com:4222'
-    jetstream.name = 'teststream'
-    jetstream.subjects = 'default.nats.example'
+    jetstream.name = 'bulk'
+    jetstream.subject_tpl = 'bulk.section.{section}'
     # Server certificate validation (tls.server_name is not working)
     tls.ca_file = '/etc/ssl/certs/ca-certificates.crt'
     # Client certificate

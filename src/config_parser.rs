@@ -3,7 +3,7 @@ use std::fs;
 use toml::Value;
 
 
-pub static MISSING_VALUE: &str = "";
+static MISSING_VALUE: &str = "";
 
 #[derive(Debug)]
 pub struct NatsConfig {
@@ -16,7 +16,8 @@ pub struct NatsConfig {
 pub struct JetStreamConfig {
     pub server: Box<str>,
     pub name: Box<str>,
-    pub subjects: Box<str>,
+    pub subject_any: Box<str>,
+    pub subject_tpl: Box<str>,
     pub tls: Option<TlsConfig>,
 }
 
@@ -60,9 +61,9 @@ fn parse_input_config(config: &Value) -> NatsConfig {
     let tls = input_section.get("tls").map(|tls_section| parse_tls_config(tls_section));
 
     NatsConfig {
-        server,
-        subject,
-        tls,
+        server: server,
+        subject: subject,
+        tls: tls,
     }
 }
 
@@ -71,29 +72,36 @@ fn parse_sink_config(config: &Value) -> JetStreamConfig {
 
     let server: Box<str>;
     let name: Box<str>;
-    let subjects: Box<str>;
+    let subject_tpl: Box<str>;
 
     match sink_section.get("jetstream") {
         Some(jetstream) => {
             server = jetstream.get("server").and_then(|v| v.as_str()).unwrap_or(MISSING_VALUE).into();
             name = jetstream.get("name").and_then(|v| v.as_str()).unwrap_or(MISSING_VALUE).into();
-            // XXX: should this be an array?
-            subjects = jetstream.get("subjects").and_then(|v| v.as_str()).unwrap_or(MISSING_VALUE).into();
+            subject_tpl = jetstream.get("subject_tpl").and_then(|v| v.as_str()).unwrap_or(MISSING_VALUE).into();
         },
         None => {
             server = MISSING_VALUE.into();
             name = MISSING_VALUE.into();
-            subjects = MISSING_VALUE.into();
+            subject_tpl = MISSING_VALUE.into();
         },
     };
 
     let tls = sink_section.get("tls").map(|tls_section| parse_tls_config(tls_section));
 
+    // Copy the "abc.{def}" template and turn into "abc.*"
+    let mut subject_any_str: String = subject_tpl.clone().into();
+    if let Some(index) = subject_any_str.find('{') {
+        subject_any_str.replace_range(index.., "*");
+    }
+    let subject_any: Box<str> = subject_any_str.into();
+
     JetStreamConfig {
-        server,
-        name,
-        subjects,
-        tls,
+        server: server,
+        name: name,
+        subject_any: subject_any,
+        subject_tpl: subject_tpl,
+        tls: tls,
     }
 }
 
@@ -104,10 +112,10 @@ fn parse_tls_config(tls_section: &Value) -> TlsConfig {
     let key_file = tls_section.get("key_file").and_then(|v| v.as_str()).map(as_box_str);
 
     TlsConfig {
-        server_name,
-        ca_file,
-        cert_file,
-        key_file,
+        server_name: server_name,
+        ca_file: ca_file,
+        cert_file: cert_file,
+        key_file: key_file,
     }
 }
 

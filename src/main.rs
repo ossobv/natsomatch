@@ -1,3 +1,4 @@
+use bytes::Bytes;
 use std::env;
 use std::result::Result;
 use std::str::FromStr; // implements from_str on PathBuf
@@ -19,10 +20,10 @@ const STATS_EVERY: u64 = 60;  // show stats every N seconds
 ///
 /// There is no conversion from Box<str> to PathBuf. Create it with to_path_buf().
 ///
-trait ConvertToPathBuf {
+trait ToPathBuf {
     fn to_path_buf(&self) -> std::path::PathBuf;
 }
-impl ConvertToPathBuf for Box<str> {
+impl ToPathBuf for Box<str> {
     fn to_path_buf(&self) -> std::path::PathBuf {
         std::path::PathBuf::from_str(self).expect("failure converting to std::path::PathBuf")
     }
@@ -31,7 +32,7 @@ impl ConvertToPathBuf for Box<str> {
 ///
 /// There is no conversion from Box<str> to Subject. Create it with to_subject().
 ///
-pub trait ToSubject {
+trait ToSubject {
     fn to_subject(&self) -> async_nats::subject::Subject;
 }
 impl ToSubject for Box<str> {
@@ -85,6 +86,28 @@ impl std::fmt::Display for Stats {
 }
 
 
+fn get_section(payload: &Bytes) -> Box<str> {
+    // FIXME: This is probably way slower than it could be. We could do manual json searching for
+    // .attributes.section instead.
+    // FIXME: We probably explode if we get invalid payload.
+    //
+    // b"{\"attributes\":{\"host\":\"...\",\"job\":\"...\",\"section\":\"osso-dmz-cat4\"},...
+    let json_bytes: &[u8] = payload;
+    let result: Result<serde_json::Value, _> = serde_json::from_slice(json_bytes);
+    match result {
+        Ok(value) => {
+            return value
+                .get("attributes").expect("missing attributes")
+                .get("section").expect("missing section")
+                .as_str().expect("invalid section")
+                .into();
+        }
+        Err(_) => {
+            return "_".into();
+        }
+    }
+}
+
 async fn connect_nats(_name: &str, server: &str, maybe_tls: &Option<TlsConfig>) -> Result<async_nats::Client, async_nats::ConnectError> {
     let mut options = async_nats::ConnectOptions::new();
 
@@ -131,6 +154,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     //println!("Appconfig {app_config:?}");
 
+    println!("Connecting to NATS (sink) {} ...", app_config.sink.server);
     let nc_out = connect_nats(
         "nats2jetstream-rs-jetstream-sink",
         &app_config.sink.server,
@@ -138,9 +162,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let js = jetstream::new(nc_out);
 
     // XXX: move to configparser
-    let js_subjects: Vec<String> = app_config.sink.subjects
+    let js_subjects: Vec<String> = app_config.sink.subject_any
         .split(',').map(|s| s.to_string()).collect();
 
+    println!("Setting up JetStream stream {} {:?} ...", app_config.sink.name, js_subjects);
     let stream_info = js.get_or_create_stream(jetstream::stream::Config {
         name: app_config.sink.name.to_string(),
         //max_bytes: 5 * 1024 * 1024 * 1024,
@@ -153,6 +178,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("- stream info: {:?}", stream_info);
     println!("");
 
+    println!("Connecting to NATS (input) {} ...", app_config.input.server);
     let nc_in = connect_nats(
         "nats2jetstream-rs-nats-input",
         &app_config.input.server,
@@ -191,11 +217,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Start the main task
     loop {
-        let subjects = app_config.sink.subjects.to_subject();
+        let subject_tpl = app_config.sink.subject_tpl.to_string();
         match subscription.next().await {
             Some(msg) => {
                 let pub_t0 = Instant::now();
-                let _maybe_ack = js.publish(subjects, msg.payload).await?;
+
+                // In the test setup, this takes about 7us:
+                let section = get_section(&msg.payload); // XXX: slow(!), replace with string search?
+                let subject = subject_tpl.replace("{section}", &*section);
+                // In the test setup, this takes about 4us:
+                let _maybe_ack = js.publish(subject, msg.payload).await?;
+
                 let pub_td = pub_t0.elapsed();
 
                 let mut period_stats = period_stats_2.lock().unwrap();
