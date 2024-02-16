@@ -5,6 +5,7 @@ use std::sync::{Arc, Mutex}; // TokioMutex only needed if we await with lock hel
 use std::time::{Duration, Instant};
 
 use async_nats::{self, jetstream};
+use async_nats::header::NATS_MESSAGE_ID;
 use futures::StreamExt; // needed for subscription.next()
 use tokio::time::sleep;
 
@@ -199,12 +200,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             Some(msg) => {
                 let pub_t0 = Instant::now();
 
-                // In the test setup, get_section_fast() takes about
-                // 0us, while the get_section_safe() takes about 7us.
-                let section = payload_parser::get_section_fast(&msg.payload);
-                let subject = subject_tpl.replace("{section}", &*section);
-                // In the test setup, this takes about 4us:
-                let _maybe_ack = js.publish(subject, msg.payload).await?;
+                let attrs = payload_parser::Attributes::from_payload(&msg.payload);
+                //println!("uniq: {}, attrs: {}", attrs.get_unique_id(), std::str::from_utf8(attrs.attributes).unwrap());
+
+                // Message headers are used in a variety of JetStream
+                // contexts, such de-duplication, auto-purging of
+                // messages, metadata from republished messages, and
+                // more.
+                // https://docs.nats.io/nats-concepts/jetstream/headers
+                // If we have a proper ID, this deduplicates messages
+                // when we're running multiple importers at the same
+                // time.
+                let mut headers = async_nats::HeaderMap::new();
+                headers.insert(NATS_MESSAGE_ID, attrs.get_unique_id().as_ref());
+
+                // In the test setup, get_section_fast() takes about 0us,
+                // while the get_section_safe() takes about 7us.
+                let subject = subject_tpl.replace("{section}", attrs.get_section());
+
+                // In the test setup, this takes about ?us:
+                let _maybe_ack = js.publish_with_headers(subject, headers, msg.payload).await?;
 
                 let pub_td = pub_t0.elapsed();
 
