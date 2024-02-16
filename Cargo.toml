@@ -18,6 +18,7 @@ panic = "abort"    # No debug stacktrace awesomeness?
 
 [[bench]]
 name = "payload_parser"
+harness = false
 
 [dev-dependencies]
 criterion = "0.5"
