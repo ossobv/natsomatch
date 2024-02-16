@@ -1,6 +1,8 @@
+#[cfg(test)]
 use serde_json::{Value, from_slice};
 
 
+#[cfg(test)]
 #[allow(dead_code)]
 pub fn get_section_safe(payload: &[u8]) -> Box<str> {
     // We expect payload to look like this:

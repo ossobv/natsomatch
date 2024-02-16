@@ -199,7 +199,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             Some(msg) => {
                 let pub_t0 = Instant::now();
 
-                // In the test setup, this takes about ???us:
+                // In the test setup, get_section_fast() takes about
+                // 0us, while the get_section_safe() takes about 7us.
                 let section = payload_parser::get_section_fast(&msg.payload);
                 let subject = subject_tpl.replace("{section}", &*section);
                 // In the test setup, this takes about 4us:
