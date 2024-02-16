@@ -16,6 +16,12 @@ lto = true	    # Enable Link Time Optimization (LTO)
 codegen-units = 1   # Serial build. Slow, but better opt
 panic = "abort"    # No debug stacktrace awesomeness?
 
+[[bench]]
+name = "payload_parser"
+
+[dev-dependencies]
+criterion = "0.5"
+
 [dependencies]
 async-nats = "0.33"
 bytes = "1"

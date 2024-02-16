@@ -1,4 +1,3 @@
-use bytes::Bytes;
 use std::env;
 use std::result::Result;
 use std::str::FromStr; // implements from_str on PathBuf
@@ -10,7 +9,7 @@ use futures::StreamExt; // needed for subscription.next()
 use tokio::time::sleep;
 
 mod config_parser;
-use self::config_parser::{AppConfig, TlsConfig, parse};
+mod payload_parser;
 
 
 const GIT_VERSION: &str = git_version::git_version!();
@@ -86,29 +85,7 @@ impl std::fmt::Display for Stats {
 }
 
 
-fn get_section(payload: &Bytes) -> Box<str> {
-    // FIXME: This is probably way slower than it could be. We could do manual json searching for
-    // .attributes.section instead.
-    // FIXME: We probably explode if we get invalid payload.
-    //
-    // b"{\"attributes\":{\"host\":\"...\",\"job\":\"...\",\"section\":\"osso-dmz-cat4\"},...
-    let json_bytes: &[u8] = payload;
-    let result: Result<serde_json::Value, _> = serde_json::from_slice(json_bytes);
-    match result {
-        Ok(value) => {
-            return value
-                .get("attributes").expect("missing attributes")
-                .get("section").expect("missing section")
-                .as_str().expect("invalid section")
-                .into();
-        }
-        Err(_) => {
-            return "_".into();
-        }
-    }
-}
-
-async fn connect_nats(_name: &str, server: &str, maybe_tls: &Option<TlsConfig>) -> Result<async_nats::Client, async_nats::ConnectError> {
+async fn connect_nats(_name: &str, server: &str, maybe_tls: &Option<config_parser::TlsConfig>) -> Result<async_nats::Client, async_nats::ConnectError> {
     let mut options = async_nats::ConnectOptions::new();
 
     if let Some(tls) = maybe_tls {
@@ -144,7 +121,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let filename = &args[2];
 
     // Parse the configuration file
-    let app_config: AppConfig = match parse(filename) {
+    let app_config: config_parser::AppConfig = match config_parser::parse(filename) {
         Ok(config) => config,
         Err(e) => {
             eprintln!("Error parsing configuration: {}", e);
@@ -223,7 +200,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let pub_t0 = Instant::now();
 
                 // In the test setup, this takes about 7us:
-                let section = get_section(&msg.payload); // XXX: slow(!), replace with string search?
+                let section = payload_parser::get_section(&msg.payload);
                 let subject = subject_tpl.replace("{section}", &*section);
                 // In the test setup, this takes about 4us:
                 let _maybe_ack = js.publish(subject, msg.payload).await?;
