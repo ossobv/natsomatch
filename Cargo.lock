@@ -715,7 +715,7 @@ dependencies = [
 
 [[package]]
 name = "nats2jetstream"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "async-nats",
  "criterion",

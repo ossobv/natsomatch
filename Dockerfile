@@ -15,15 +15,15 @@ RUN cargo install cargo-auditable cargo-audit
 
 COPY . /src/nats2jetstream
 
-RUN cargo update
-RUN cargo fetch --verbose
+RUN cargo update --dry-run --locked
+RUN cargo fetch --locked --verbose
 #RUN rustup target add x86_64-unknown-linux-musl
 
 ARG GIT_VERSION
 #RUN cargo build --features=version-from-env
 #RUN cargo test --features=version-from-env
 #RUN cargo bench --features=version-from-env
-RUN cargo auditable build --features=version-from-env \
+RUN cargo auditable build --locked --features=version-from-env \
       --release --target x86_64-unknown-linux-musl
 RUN test "$(echo $(ldd target/x86_64-unknown-linux-musl/release/nats2jetstream))" = "statically linked"
 
