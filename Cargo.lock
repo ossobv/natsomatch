@@ -721,9 +721,17 @@ dependencies = [
  "criterion",
  "futures",
  "git-version",
+ "nats2jetstream-json",
  "serde_json",
  "tokio",
  "toml",
+]
+
+[[package]]
+name = "nats2jetstream-json"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
 ]
 
 [[package]]

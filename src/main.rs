@@ -9,8 +9,8 @@ use async_nats::header::NATS_MESSAGE_ID;
 use futures::StreamExt; // needed for subscription.next()
 use tokio::time::sleep;
 
+use nats2jetstream_json::payload_parser;
 mod config_parser;
-mod payload_parser;
 
 
 const GIT_VERSION: &str = git_version::git_version!();
@@ -200,7 +200,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             Some(msg) => {
                 let pub_t0 = Instant::now();
 
-                let attrs = payload_parser::Attributes::from_payload(&msg.payload);
+                let attrs: payload_parser::BytesAttributes;
+                match payload_parser::BytesAttributes::from_payload(&msg.payload) {
+                    Ok(ok) => { attrs = ok; },
+                    Err(err) => { eprintln!("payload error: {err}"); continue; },
+                }
                 //println!("uniq: {}, attrs: {}", attrs.get_unique_id(), std::str::from_utf8(attrs.attributes).unwrap());
 
                 // Message headers are used in a variety of JetStream

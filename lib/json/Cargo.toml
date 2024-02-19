@@ -1,7 +1,7 @@
 #cargo-features = ["edition2024"]
 
 [package]
-name = "nats2jetstream"
+name = "nats2jetstream-json"
 edition = "2021"
 version = "0.1.0"
 #authors = ["Alice <a@example.com>", "Bob <b@example.com>"]
@@ -12,23 +12,16 @@ version = "0.1.0"
 [profile.release]
 strip = true        # Automatically strip symbols from the binary
 #opt-level = "z"    # Optimize for size?
-lto = true	    # Enable Link Time Optimization (LTO)
+lto = true          # Enable Link Time Optimization (LTO)
 codegen-units = 1   # Serial build. Slow, but better opt
-panic = "abort"    # No debug stacktrace awesomeness?
+#panic = "abort"    # No debug stacktrace awesomeness?
 
 [[bench]]
-name = "nats_utils"
+name = "payload_parser"
 harness = false
 
 [dev-dependencies]
 criterion = "0.5"
 
 [dependencies]
-nats2jetstream-json = { path = "lib/json" }
-
-async-nats = "0.33"
-git-version = "0.3"
-futures = "0.3"
 serde_json = "1" # NOTE: remove if we remove get_section_safe()
-toml = "0.8"
-tokio = {version = "1.36", features = ["full"]}
