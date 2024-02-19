@@ -1,10 +1,10 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
-use nats_payload_ossobv::payload_parser;
+use nats2jetstream_json::payload_parser;
 
 
 fn criterion_benchmark(c: &mut Criterion) {
-    static TS_JSB: &[u8] = br#"{"attributes":{"filename":"/var/log/auth.log","host":"mgmt.example","observed_time_unix_nano":1708101998674019800,"section":"SCT","job":"loki","systemd_unit":"ssh.service","time_unix_nano":1708101998323659000}
+    static TS_JSB: &[u8] = br#"{"attributes":{"filename":"/var/log/auth.log","host":"mgmt.example","observed_time_unix_nano":1708349372637827462,"section":"SCT","job":"loki","systemd_unit":"ssh.service","time_unix_nano":1708349372636882340}
         ,"message":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
         ,"message1":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
         ,"message2":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
@@ -15,11 +15,11 @@ fn criterion_benchmark(c: &mut Criterion) {
         ,"message7":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
         ,"message8":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
         ,"message9":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-        ,"observed_timestamp":"2024-02-16T15:45:17.366891180Z"
+        ,"observed_timestamp":"2024-02-19T13:29:32.637827462Z"
         ,"somedict":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21]
-        ,"timestamp":"2024-02-16T15:45:16.266891180Z"}"#;
+        ,"timestamp":"2024-02-19T13:29:32.636882340Z"}"#;
 
-    static NO_TS_JSB: &[u8] = br#"{"attributes":{"filename":"/var/log/auth.log","host":"mgmt.example","observed_time_unix_nano":1708101998674019800,"section":"SCT","job":"loki","systemd_unit":"ssh.service"}
+    static NO_TS_JSB: &[u8] = br#"{"attributes":{"filename":"/var/log/auth.log","host":"mgmt.example","observed_time_unix_nano":1708349372637827462,"section":"SCT","job":"loki","systemd_unit":"ssh.service"}
         ,"message":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
         ,"message1":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
         ,"message2":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
@@ -30,9 +30,9 @@ fn criterion_benchmark(c: &mut Criterion) {
         ,"message7":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
         ,"message8":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
         ,"message9":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-        ,"observed_timestamp":"2024-02-16T15:45:17.366891180Z"
+        ,"observed_timestamp":"2024-02-19T13:29:32.637827462Z"
         ,"somedict":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21]
-        ,"timestamp":"2024-02-16T15:45:16.266891180Z"}"#;
+        ,"timestamp":"2024-02-19T13:29:32.636882340Z"}"#;
 
     c.bench_function("BytesAttributes::from_payload(NO_TS_JSB)", |b| {
         b.iter(|| payload_parser::BytesAttributes::from_payload(black_box(NO_TS_JSB)).unwrap().get_unique_id())

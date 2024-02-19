@@ -24,10 +24,10 @@
 ///   "attributes": {
 ///     "host": "mgmt.example",
 ///     "job": "loki.source.journal.logs_journald_generic",
-///     "observed_time_unix_nano": 1708101998674019800,
+///     "observed_time_unix_nano": 1708349372637827462,
 ///     "section": "section-dmz-cat4",
 ///     "systemd_unit": "session-7889.scope",
-///     "time_unix_nano": 1708101998323659000
+///     "time_unix_nano": 1708349372636882340
 ///   },
 ///   "dropped_attributes_count": 0,
 ///   "message": <900 bytes>,
@@ -51,7 +51,8 @@ fn force_string(data: &[u8]) -> &str {
 pub struct BytesAttributes<'a> {
     pub hostname: &'a [u8],
     pub section: &'a [u8],
-    pub timestamp: &'a [u8],
+    pub rep_timestamp: &'a [u8],
+    pub obs_timestamp: &'a [u8],
 }
 
 ///
@@ -62,7 +63,8 @@ pub struct BytesAttributes<'a> {
 pub struct StringAttributes {
     pub hostname: String,
     pub section: String,
-    pub timestamp: String,
+    pub rep_timestamp: String,
+    pub obs_timestamp: String,
 }
 
 
@@ -72,7 +74,9 @@ impl<'a> BytesAttributes<'a> {
     }
 
     pub fn get_unique_id(&self) -> String {
-        format!("{}H{}", force_string(self.timestamp), force_string(self.hostname))
+        format!(
+            "T{}O{}H{}", force_string(self.rep_timestamp),
+            force_string(self.obs_timestamp), force_string(self.hostname))
     }
 
     pub fn get_section(&self) -> &str {
@@ -86,23 +90,35 @@ impl<'a> BytesAttributes<'a> {
 
         let mut hostname: &'a [u8] = &payload[0..0];
         let mut section: &'a [u8] = &payload[0..0];
-        let mut timestamp: &'a [u8] = &payload[0..0];
+        let mut rep_timestamp: &'a [u8] = &payload[0..0];
+        let mut obs_timestamp: &'a [u8] = &payload[0..0];
 
         let mut i: usize = 0usize;
 
         Self::consume_token(payload, &mut i, b'{')?;
-        while (isunset(hostname) || isunset(section) || isunset(timestamp)) && i < payload.len() {
+        while (isunset(hostname) || isunset(section) || isunset(rep_timestamp)
+                    || isunset(obs_timestamp))
+                && i < payload.len() {
+
             let key = Self::consume_key(payload, &mut i)?;
             Self::consume_token(payload, &mut i, b':')?;
             if key == b"attributes" {
-                Self::consume_special_attributes(payload, &mut i, &mut hostname, &mut section, &mut timestamp)?;
+                Self::consume_special_attributes(
+                    payload, &mut i, &mut hostname, &mut section,
+                    &mut rep_timestamp, &mut obs_timestamp)?;
                 //println!("[{}] {} from_payload after special", i, payload[i]);
             } else if key == b"timestamp" {
                 // This is only used if the "attributes" dict has no
                 // "time_unix_nano". Otherwise the
                 // consume_special_attributes() already completes the
                 // while condition.
-                timestamp = Self::consume_string(payload, &mut i)?;
+                rep_timestamp = Self::consume_string(payload, &mut i)?;
+            } else if key == b"observed_timestamp" {
+                // This is only used if the "attributes" dict has no
+                // "observed_time_unix_nano". Otherwise the
+                // consume_special_attributes() already completes the
+                // while condition.
+                obs_timestamp = Self::consume_string(payload, &mut i)?;
             } else {
                 Self::consume_value(payload, &mut i)?;
             }
@@ -117,14 +133,15 @@ impl<'a> BytesAttributes<'a> {
             }
         }
 
-        if isunset(hostname) || isunset(section) || isunset(timestamp) {
+        if isunset(hostname) || isunset(section) || isunset(rep_timestamp) || isunset(obs_timestamp) {
             return Err("one or more missing attributes in from_payload");
         }
 
         Ok(BytesAttributes {
             hostname: hostname,
             section: section,
-            timestamp: timestamp,
+            rep_timestamp: rep_timestamp,
+            obs_timestamp: obs_timestamp,
         })
     }
 
@@ -134,7 +151,8 @@ impl<'a> BytesAttributes<'a> {
             i: &mut usize,
             hostname: &mut &'a [u8],
             section: &mut &'a [u8],
-            timestamp: &mut &'a [u8]
+            rep_timestamp: &mut &'a [u8],
+            obs_timestamp: &mut &'a [u8]
             ) -> Result<(), &'static str> {
 
         Self::consume_token(payload, i, b'{')?;
@@ -144,7 +162,7 @@ impl<'a> BytesAttributes<'a> {
         // section and timestamp all have a non-0 start. That way, the
         // timestamp from the attributes will get precedence over the
         // timestamp from the root json dict.
-        let mut bingo: u32 = 0; // 1 /* hostname */ + 2 /* section */ + 4 /* timestamp */;
+        let mut bingo: u32 = 0; // 1 /* hostname */ + 2 /* section */ + 4 /* rep_timestamp */ + 8 /* obs_timestamp */;
 
         while *i < payload.len() {
             let key = Self::consume_key(payload, i)?;
@@ -159,8 +177,12 @@ impl<'a> BytesAttributes<'a> {
                     bingo |= 2;
                 },
                 b"time_unix_nano" => {
-                    *timestamp = Self::consume_other(payload, i)?;
+                    *rep_timestamp = Self::consume_other(payload, i)?;
                     bingo |= 4;
+                },
+                b"observed_time_unix_nano" => {
+                    *obs_timestamp = Self::consume_other(payload, i)?;
+                    bingo |= 8;
                 },
                 _ => {
                     Self::consume_value(payload, i)?;
@@ -168,7 +190,7 @@ impl<'a> BytesAttributes<'a> {
             }
 
             // Quick exit if we have all needed values.
-            if bingo == 7 {
+            if bingo == 15 {
                 return Ok(());
             }
 
@@ -336,7 +358,8 @@ impl StringAttributes {
 
         let hostname: String;
         let section: String;
-        let timestamp: String;
+        let rep_timestamp: String;
+        let obs_timestamp: String;
 
         if let Some(attributes) = root.get("attributes") {
             hostname = attributes.get("host").and_then(|v| v.as_str()).map(|s| s.to_string())
@@ -344,11 +367,18 @@ impl StringAttributes {
             section = attributes.get("section").and_then(|v| v.as_str()).map(|s| s.to_string())
                 .ok_or("section parse error")?;
             if let Some(ts) = attributes.get("time_unix_nano") {
-                timestamp = ts.as_i64().map(|s| s.to_string())
+                rep_timestamp = ts.as_i64().map(|s| s.to_string())
                     .ok_or("nano timestamp parse error")?;
             } else {
-                timestamp = root.get("timestamp").and_then(|v| v.as_str()).map(|s| s.to_string())
+                rep_timestamp = root.get("timestamp").and_then(|v| v.as_str()).map(|s| s.to_string())
                     .ok_or("timestamp parse error")?;
+            }
+            if let Some(ts) = attributes.get("observed_time_unix_nano") {
+                obs_timestamp = ts.as_i64().map(|s| s.to_string())
+                    .ok_or("nano observed timestamp parse error")?;
+            } else {
+                obs_timestamp = root.get("observed_timestamp").and_then(|v| v.as_str()).map(|s| s.to_string())
+                    .ok_or("observed_timestamp parse error")?;
             }
         } else {
             return Err("one or more attributes not found");
@@ -357,12 +387,13 @@ impl StringAttributes {
         Ok(StringAttributes {
             hostname: hostname.to_string(),
             section: section.to_string(),
-            timestamp: timestamp.to_string(),
+            rep_timestamp: rep_timestamp.to_string(),
+            obs_timestamp: obs_timestamp.to_string(),
         })
     }
 
     pub fn get_unique_id(&self) -> String {
-        format!("{}H{}", self.timestamp, self.hostname)
+        format!("T{}O{}H{}", self.rep_timestamp, self.obs_timestamp, self.hostname)
     }
 
     pub fn get_section(&self) -> &str {
@@ -428,7 +459,7 @@ fn memchr(haystack: &[u8], needle: u8) -> Option<usize> {
 mod tests {
     use super::*;
 
-    static EXPECTED_JSB: &[u8] = br#"{"attributes":{"filename":"/var/log/auth.log","host":"mgmt.example","observed_time_unix_nano":1708101998674019800,"section":"SCT","job":"loki","systemd_unit":"ssh.service","time_unix_nano":1708101998323659000}
+    static EXPECTED_JSB: &[u8] = br#"{"attributes":{"filename":"/var/log/auth.log","host":"mgmt.example","observed_time_unix_nano":1708349372637827462,"section":"SCT","job":"loki","systemd_unit":"ssh.service","time_unix_nano":1708349372636882340}
         ,"message":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
         ,"message1":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
         ,"message2":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
@@ -439,9 +470,9 @@ mod tests {
         ,"message7":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
         ,"message8":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
         ,"message9":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-        ,"observed_timestamp":"2024-02-16T15:45:17.366891180Z"
+        ,"observed_timestamp":"2024-02-19T13:29:32.637827462Z"
         ,"somedict":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21]
-        ,"timestamp":"2024-02-16T15:45:16.266891180Z"}"#;
+        ,"timestamp":"2024-02-19T13:29:32.636882340Z"}"#;
 
     static REORDERED_JSB: &[u8] = br#"
         {"message":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
@@ -454,29 +485,30 @@ mod tests {
         ,"message7":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
         ,"message8":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
         ,"message9":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-        ,"observed_timestamp":"2024-02-16T15:45:17.366891180Z"
+        ,"observed_timestamp":"2024-02-19T13:29:32.637827462Z"
         ,"somedict":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21]
-        ,"timestamp":"2024-02-16T15:45:16.266891180Z"
+        ,"timestamp":"2024-02-19T13:29:32.636882340Z"
         ,"attributes":{"filename":"/var/log/auth.log","host":"mgmt.example"
-         ,"observed_time_unix_nano":1708101998674019800,"section":"SCT"
+         ,"observed_time_unix_nano":1708349372637827462,"section":"SCT"
          ,"job":"loki","systemd_unit":"ssh.service"
-         ,"time_unix_nano":1708101998323659000}}"#;
+         ,"time_unix_nano":1708349372636882340}}"#;
 
     static NO_TIME_NANO_JSB: &[u8] = br#"
         {"attributes":{"filename":"/var/log/auth.log","host":"mgmt.example"
          ,"section":"SCT","job":"loki","systemd_unit":"ssh.service"}
         ,"message":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-        ,"observed_timestamp":"2024-02-16T15:45:17.366891180Z"
+        ,"observed_timestamp":"2024-02-19T13:29:32.637827462Z"
         ,"somedict":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21]
-        ,"timestamp":"2024-02-16T15:45:16.266891180Z"}"#;
+        ,"timestamp":"2024-02-19T13:29:32.636882340Z"}"#;
 
     #[test]
     fn test_safe() {
         let attrs = StringAttributes::from_payload(EXPECTED_JSB).expect("parse error");
         assert_eq!(attrs.hostname, r#"mgmt.example"#);
-        assert_eq!(attrs.timestamp, r#"1708101998323659000"#);
+        assert_eq!(attrs.rep_timestamp, r#"1708349372636882340"#);
+        assert_eq!(attrs.obs_timestamp, r#"1708349372637827462"#);
         assert_eq!(attrs.get_section(), "SCT");
-        assert_eq!(attrs.get_unique_id(), "1708101998323659000Hmgmt.example");
+        assert_eq!(attrs.get_unique_id(), "T1708349372636882340O1708349372637827462Hmgmt.example");
 
         let attrs2 = StringAttributes::from_payload(REORDERED_JSB).expect("parse error");
         assert_eq!(attrs, attrs2);
@@ -486,18 +518,20 @@ mod tests {
     fn test_safe_ts_from_root() {
         let attrs = StringAttributes::from_payload(NO_TIME_NANO_JSB).expect("parse error");
         assert_eq!(attrs.hostname, r#"mgmt.example"#);
-        assert_eq!(attrs.timestamp, r#"2024-02-16T15:45:16.266891180Z"#);
+        assert_eq!(attrs.rep_timestamp, r#"2024-02-19T13:29:32.636882340Z"#);
+        assert_eq!(attrs.obs_timestamp, r#"2024-02-19T13:29:32.637827462Z"#);
         assert_eq!(attrs.get_section(), "SCT");
-        assert_eq!(attrs.get_unique_id(), "2024-02-16T15:45:16.266891180ZHmgmt.example");
+        assert_eq!(attrs.get_unique_id(), "T2024-02-19T13:29:32.636882340ZO2024-02-19T13:29:32.637827462ZHmgmt.example");
     }
 
     #[test]
     fn test_fast() {
         let attrs = BytesAttributes::from_payload(EXPECTED_JSB).expect("parse error");
         assert_eq!(force_string(attrs.hostname), r#"mgmt.example"#);
-        assert_eq!(force_string(attrs.timestamp), r#"1708101998323659000"#);
+        assert_eq!(force_string(attrs.rep_timestamp), r#"1708349372636882340"#);
+        assert_eq!(force_string(attrs.obs_timestamp), r#"1708349372637827462"#);
         assert_eq!(attrs.get_section(), "SCT");
-        assert_eq!(attrs.get_unique_id(), "1708101998323659000Hmgmt.example");
+        assert_eq!(attrs.get_unique_id(), "T1708349372636882340O1708349372637827462Hmgmt.example");
 
         let attrs2 = BytesAttributes::from_payload(REORDERED_JSB).expect("parse error");
         assert_eq!(attrs, attrs2);
@@ -507,9 +541,10 @@ mod tests {
     fn test_fast_ts_from_root() {
         let attrs = BytesAttributes::from_payload(NO_TIME_NANO_JSB).expect("parse error");
         assert_eq!(force_string(attrs.hostname), r#"mgmt.example"#);
-        assert_eq!(force_string(attrs.timestamp), r#"2024-02-16T15:45:16.266891180Z"#);
+        assert_eq!(force_string(attrs.rep_timestamp), r#"2024-02-19T13:29:32.636882340Z"#);
+        assert_eq!(force_string(attrs.obs_timestamp), r#"2024-02-19T13:29:32.637827462Z"#);
         assert_eq!(attrs.get_section(), "SCT");
-        assert_eq!(attrs.get_unique_id(), "2024-02-16T15:45:16.266891180ZHmgmt.example");
+        assert_eq!(attrs.get_unique_id(), "T2024-02-19T13:29:32.636882340ZO2024-02-19T13:29:32.637827462ZHmgmt.example");
     }
 
     #[test]
