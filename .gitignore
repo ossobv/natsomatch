@@ -11,6 +11,7 @@
 *.pyc
 *.swp
 __pycache__
+/nats2jetstream
 
 # Do not gitignore Cargo.lock (for now)
 # https://doc.rust-lang.org/cargo/guide/cargo-toml-vs-cargo-lock.html
@@ -18,3 +19,4 @@ __pycache__
 
 # Output directories
 /target
+/lib/*/target

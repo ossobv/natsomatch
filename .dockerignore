@@ -1,0 +1,12 @@
+*
+
+!Cargo.*
+!Makefile
+!git-info.txt
+!*.rst
+
+!benches
+!lib
+!src
+
+lib/*/target

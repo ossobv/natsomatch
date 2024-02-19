@@ -13,7 +13,11 @@ use nats2jetstream_json::payload_parser;
 mod config_parser;
 
 
+#[cfg(feature = "version-from-env")]
+const GIT_VERSION: &str = env!("GIT_VERSION");
+#[cfg(not(feature = "version-from-env"))]
 const GIT_VERSION: &str = git_version::git_version!();
+
 const STATS_EVERY: u64 = 60;  // show stats every N seconds
 
 

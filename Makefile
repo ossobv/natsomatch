@@ -1,12 +1,14 @@
 .PHONY: all
-all: test debug release
+all: lib test debug release
 
 .PHONY: test
 test:
+	make -C lib test
 	cargo test
 
 .PHONY: bench
 bench:
+	make -C lib bench
 	cargo bench
 
 .PHONY: debug

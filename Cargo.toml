@@ -16,9 +16,17 @@ lto = true	    # Enable Link Time Optimization (LTO)
 codegen-units = 1   # Serial build. Slow, but better opt
 panic = "abort"    # No debug stacktrace awesomeness?
 
+[features]
+version-from-env = []
+
 [[bench]]
 name = "nats_utils"
 harness = false
+
+#[[bin]]
+#name = "nats2jetstream"
+#path = "main.rs"
+#target = "src/main.rs"
 
 [dev-dependencies]
 criterion = "0.5"
