@@ -820,7 +820,7 @@ dependencies = [
 
 [[package]]
 name = "nats2jetstream"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "async-nats",
  "bytes",
@@ -837,7 +837,7 @@ dependencies = [
 
 [[package]]
 name = "nats2jetstream-json"
-version = "0.1.0"
+version = "0.1.2"
 
 [[package]]
 name = "nkeys"

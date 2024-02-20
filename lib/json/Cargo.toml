@@ -3,7 +3,7 @@
 [package]
 name = "nats2jetstream-json"
 edition = "2021"
-version = "0.1.0"
+version = "0.1.2"
 #authors = ["Alice <a@example.com>", "Bob <b@example.com>"]
 
 # https://github.com/johnthagen/min-sized-rust
