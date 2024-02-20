@@ -49,26 +49,34 @@ impl ToSubject for Box<str> {
 
 struct Stats {
     t0: Instant,
-    pub_count: u64,
-    pub_duration: Duration,
+    count: u64,
+    prepare_t: Duration,
+    publish_t: Duration,
 }
 
 impl Stats {
     fn default() -> Stats {
-        Stats{t0: Instant::now(), pub_count: 0, pub_duration: Duration::default()}
+        Stats{
+            t0: Instant::now(),
+            count: 0,
+            prepare_t: Duration::default(),
+            publish_t: Duration::default(),
+        }
     }
 
     fn reset(&mut self) -> &Stats {
         // FIXME: dupe code with default()?
         self.t0 = Instant::now();
-        self.pub_count = 0;
-        self.pub_duration = Duration::default();
+        self.count = 0;
+        self.prepare_t = Duration::default();
+        self.publish_t = Duration::default();
         self
     }
 
-    fn inc_pub(&mut self, pub_duration: Duration) -> &Stats {
-        self.pub_count += 1;
-        self.pub_duration += pub_duration;
+    fn inc(&mut self, prepare_t: Duration, publish_t: Duration) -> &Stats {
+        self.count += 1;
+        self.prepare_t += prepare_t;
+        self.publish_t += publish_t;
         self
     }
 }
@@ -76,16 +84,19 @@ impl Stats {
 impl std::fmt::Display for Stats {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let elapsed = self.t0.elapsed().as_secs();
-        let msg_per_sec: f32 = (self.pub_count as f32) / (elapsed as f32);
-        let us_per_msg: f32;
-        if self.pub_count > 0 {
-            us_per_msg = (self.pub_duration.as_micros() as f32) / (self.pub_count as f32);
+        let msg_per_sec: f32 = (self.count as f32) / (elapsed as f32);
+        let prep_us_per_msg: f32;
+        let pub_us_per_msg: f32;
+        if self.count > 0 {
+            prep_us_per_msg = (self.prepare_t.as_micros() as f32) / (self.count as f32);
+            pub_us_per_msg = (self.publish_t.as_micros() as f32) / (self.count as f32);
         } else {
-            us_per_msg = 0.0;
+            prep_us_per_msg = 0.0;
+            pub_us_per_msg = 0.0;
         }
         write!(
-            f, "{}s {}msg {:.3}msg/s {:.3}µs/msg(pub)",
-            elapsed, self.pub_count, msg_per_sec, us_per_msg)
+            f, "{}s {}msg {:.1}msg/s {:.3}µs/msg(prep) {:.3}µs/msg(pub)",
+            elapsed, self.count, msg_per_sec, prep_us_per_msg, pub_us_per_msg)
     }
 }
 
@@ -202,7 +213,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let subject_tpl = app_config.sink.subject_tpl.to_string();
         match subscription.next().await {
             Some(msg) => {
-                let pub_t0 = Instant::now();
+                let prep_t0 = Instant::now();
 
                 let attrs: payload_parser::BytesAttributes;
                 match payload_parser::BytesAttributes::from_payload(&msg.payload) {
@@ -225,18 +236,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 // In the test setup, get_section_fast() takes about 0us,
                 // while the get_section_safe() takes about 7us.
                 let subject = subject_tpl.replace("{section}", attrs.get_section());
+                let prep_td = prep_t0.elapsed();
 
                 // In the test setup, this takes about ?us:
+                let pub_t0 = Instant::now();
                 let _maybe_ack = js.publish_with_headers(subject, headers, msg.payload).await?;
-
                 let pub_td = pub_t0.elapsed();
 
                 let mut period_stats = period_stats_2.lock().unwrap();
-                period_stats.inc_pub(pub_td);
+                period_stats.inc(prep_td, pub_td);
                 drop(period_stats);
 
                 let mut forever_stats = forever_stats_2.lock().unwrap();
-                forever_stats.inc_pub(pub_td);
+                forever_stats.inc(prep_td, pub_td);
                 drop(forever_stats);
             }
             None => {
