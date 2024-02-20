@@ -37,7 +37,6 @@
 /// }
 ///
 
-use serde_json;
 
 fn force_string(data: &[u8]) -> &str {
     std::str::from_utf8(data).unwrap()
@@ -58,6 +57,7 @@ pub struct BytesAttributes<'a> {
 ///
 /// Result of the safe parser.
 ///
+#[cfg(feature = "benchmark")]
 #[derive(Debug)]
 #[derive(PartialEq)]
 pub struct StringAttributes {
@@ -352,6 +352,7 @@ impl<'a> BytesAttributes<'a> {
 }
 
 
+#[cfg(feature = "benchmark")]
 impl StringAttributes {
     pub fn from_payload(payload: &[u8]) -> Result<StringAttributes, &str> {
         let root: serde_json::Value = serde_json::from_slice(payload).map_err(|_| "json parse error")?;
@@ -501,6 +502,7 @@ mod tests {
         ,"somedict":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21]
         ,"timestamp":"2024-02-19T13:29:32.636882340Z"}"#;
 
+    #[cfg(feature = "benchmark")]
     #[test]
     fn test_safe() {
         let attrs = StringAttributes::from_payload(EXPECTED_JSB).expect("parse error");
@@ -514,6 +516,7 @@ mod tests {
         assert_eq!(attrs, attrs2);
     }
 
+    #[cfg(feature = "benchmark")]
     #[test]
     fn test_safe_ts_from_root() {
         let attrs = StringAttributes::from_payload(NO_TIME_NANO_JSB).expect("parse error");

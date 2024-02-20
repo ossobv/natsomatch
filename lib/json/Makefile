@@ -3,11 +3,11 @@ all: test debug release
 
 .PHONY: test
 test:
-	cargo test
+	cargo test --features benchmark
 
 .PHONY: bench
 bench:
-	cargo bench
+	cargo bench --features benchmark
 
 .PHONY: debug
 debug:
