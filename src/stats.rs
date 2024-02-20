@@ -49,7 +49,7 @@ impl std::fmt::Display for Stats {
             pub_us_per_msg = 0.0;
         }
         write!(
-            f, "{}s {}msg {:.1}msg/s {:.3}µs/msg(prep) {:.3}µs/msg(pub)",
+            f, "{}s {}x {:.1}x/s {:.3}µs/prep {:.3}µs/pub",
             elapsed, self.count, msg_per_sec, prep_us_per_msg, pub_us_per_msg)
     }
 }
