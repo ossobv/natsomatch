@@ -718,6 +718,7 @@ name = "nats2jetstream"
 version = "0.1.1"
 dependencies = [
  "async-nats",
+ "bytes",
  "criterion",
  "futures",
  "git-version",
