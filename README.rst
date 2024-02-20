@@ -9,26 +9,26 @@ TODO
 ----
 
 
+☐  Add /healthz check.
+
 ☐  Check and fix behaviour on NATS/subscription disconnect/error.
 
 ☐  Check and fix behaviour on NATS/JetStream disconnect/error.
 
-☐  Create systemd unitfile or K8S image for continuous running.
+☐  Consider whether we want to do any parsing so we can do filtering or better subject setting.
+
+- right now we parse the ``"section"`` from the attributes and can place that in the subject ``{section}``.
+
+☐  Small stuff:
+
+- Log/info when starting.
+- Log/info when stopping.
+- Add a buffer for unique-ids so we can detect and error if were generating dupe unique ids.
 
 ☐  Check and configure output JetStream parameters:
 
 - ``{"max_bytes": -1, "max_messages": -1, "discard": "Old", "max_age": 0, "max_message_size": -1, "no_ack": false}``
 - See more here: https://docs.nats.io/nats-concepts/jetstream/streams
-
-☐  Discuss whether we want to do anything with JetStream subjects at this point. Makes sense to populate with sections maybe.
-
-☐  Consider whether we want to do any parsing so we can do filtering or better subject setting.
-
-☐  Naming:
-
-- input subject suggestion: "NS.log.vector-in"
-- jetstream name suggestion: "bulk"
-- jetstream subjects suggestion: "bulk.section.{section}"
 
 
 -------------------
@@ -41,7 +41,7 @@ Configuration for the Rust version:
 
     [input.my_nats]
     # Input source
-    nats.server = 'tls://10.20.30.40:4222'
+    nats.server = 'nats://10.20.30.40:4222'
     nats.subject = 'NS.log.vector-in'
     # Server certificate validation (tls.server_name is not working)
     tls.server_name = 'nats.local'
@@ -52,7 +52,7 @@ Configuration for the Rust version:
 
     [sink.my_jetstream]
     # Output target
-    jetstream.server = 'tls://nats.example.com:4222'
+    jetstream.server = 'nats://nats.example.com:4222'
     jetstream.name = 'bulk'
     jetstream.subject_tpl = 'bulk.section.{section}'
     # Server certificate validation (tls.server_name is not working)

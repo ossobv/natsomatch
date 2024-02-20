@@ -207,7 +207,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let attrs: payload_parser::BytesAttributes;
                 match payload_parser::BytesAttributes::from_payload(&msg.payload) {
                     Ok(ok) => { attrs = ok; },
-                    Err(err) => { eprintln!("payload error: {err}"); continue; },
+                    Err(err) => { eprintln!("payload error: {}; {:?}", err, msg.payload); continue; },
                 }
                 //println!("uniq: {}, attrs: {}", attrs.get_unique_id(), std::str::from_utf8(attrs.attributes).unwrap());
 
