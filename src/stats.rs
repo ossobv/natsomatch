@@ -9,15 +9,21 @@ pub struct Stats {
     publish_t: Duration,
 }
 
-impl Stats {
-    pub fn default() -> Stats {
-        Stats{
+impl Default for Stats {
+    fn default() -> Self {
+        Self {
             t0: Instant::now(),
             tlatest: Instant::now(),
             count: 0,
             prepare_t: Duration::default(),
             publish_t: Duration::default(),
         }
+    }
+}
+
+impl Stats {
+    pub fn new() -> Self {
+        Self::default()
     }
 
     pub fn get_count(&self) -> u64 {

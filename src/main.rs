@@ -59,10 +59,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let mut input = inputs::Input::from_config(&app_config.input).await?;
 
     // Stats where we record how we're doing (lock order: forever<period)
-    let forever_stats_stats = Arc::new(Mutex::new(stats::Stats::default()));
+    let forever_stats_stats = Arc::new(Mutex::new(stats::Stats::new()));
     let forever_stats_healthz = forever_stats_stats.clone();
     let forever_stats_io = forever_stats_stats.clone();
-    let period_stats_stats = Arc::new(Mutex::new(stats::Stats::default()));
+    let period_stats_stats = Arc::new(Mutex::new(stats::Stats::new()));
     let period_stats_healthz = period_stats_stats.clone();
     let period_stats_io = period_stats_stats.clone();
 

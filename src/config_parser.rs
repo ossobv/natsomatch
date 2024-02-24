@@ -37,8 +37,9 @@ pub struct AppConfig {
 
 
 fn as_box_str(input: &str) -> Box<str> {
-    //String::from(input).into()            // Which of these
-    input.to_string().into_boxed_str()      // two is better?
+    //String::from(input).into()        // Which of
+    //input.to_string().into()          // these three
+    input.to_owned().into_boxed_str()   // is better?
 }
 
 fn parse_input_config(config: &Value) -> NatsConfig {
@@ -94,7 +95,7 @@ fn parse_sink_config(config: &Value) -> JetStreamConfig {
     if let Some(index) = subject_any_str.find('{') {
         subject_any_str.replace_range(index.., "*");
     }
-    let subject_any: Box<str> = subject_any_str.into();
+    let subject_any: Box<str> = subject_any_str.into_boxed_str();
 
     JetStreamConfig {
         server: server,

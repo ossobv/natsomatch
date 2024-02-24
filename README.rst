@@ -9,7 +9,15 @@ TODO
 ----
 
 
-☐  Add /healthz check.
+☐  Add configurable bind address for /healthz server.
+
+☐  See if we want to rely on ghcr.io/rust-cross/rust-musl-cross ( https://github.com/rust-cross/rust-musl-cross ) or want to build something from the official images.
+
+☐  Small stuff:
+
+- Log/info when starting.
+- Log/info when stopping.
+- Add a buffer for unique-ids so we can detect and error if were generating dupe unique ids.
 
 ☐  Check and fix behaviour on NATS/subscription disconnect/error.
 
@@ -18,12 +26,6 @@ TODO
 ☐  Consider whether we want to do any parsing so we can do filtering or better subject setting.
 
 - right now we parse the ``"section"`` from the attributes and can place that in the subject ``{section}``.
-
-☐  Small stuff:
-
-- Log/info when starting.
-- Log/info when stopping.
-- Add a buffer for unique-ids so we can detect and error if were generating dupe unique ids.
 
 ☐  Check and configure output JetStream parameters:
 
