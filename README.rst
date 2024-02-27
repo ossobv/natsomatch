@@ -8,8 +8,14 @@ persistent NATS JetStream.
 TODO
 ----
 
+☐  Add JetStream target/sink configuration?
 
-☐  Add configurable bind address for /healthz server.
+- We probably want: replicas 3.
+- Maybe: allow-direct.
+- ``{"max_bytes": -1, "max_messages": -1, "discard": "Old", "max_age": 0, "max_message_size": -1, "no_ack": false}``
+- See more here: https://docs.nats.io/nats-concepts/jetstream/streams
+
+☐  Add configurable bind address for /healthz server. Use a ping/pong test on input/sink too?
 
 ☐  See if we want to rely on ghcr.io/rust-cross/rust-musl-cross ( https://github.com/rust-cross/rust-musl-cross ) or want to build something from the official images.
 
@@ -27,10 +33,6 @@ TODO
 
 - right now we parse the ``"section"`` from the attributes and can place that in the subject ``{section}``.
 
-☐  Check and configure output JetStream parameters:
-
-- ``{"max_bytes": -1, "max_messages": -1, "discard": "Old", "max_age": 0, "max_message_size": -1, "no_ack": false}``
-- See more here: https://docs.nats.io/nats-concepts/jetstream/streams
 
 
 -------------------
