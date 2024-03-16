@@ -16,8 +16,9 @@ impl ToPathBuf for Box<str> {
 }
 
 
-pub async fn connect(_name: &str, server: &str, maybe_tls: &Option<config_parser::TlsConfig>) -> Result<async_nats::Client, async_nats::ConnectError> {
-    let mut options = async_nats::ConnectOptions::new();
+pub async fn connect(name: &str, server: &str, maybe_tls: &Option<config_parser::TlsConfig>) -> Result<async_nats::Client, async_nats::ConnectError> {
+    let mut options = async_nats::ConnectOptions::new()
+        .name(name);
 
     if let Some(tls) = maybe_tls {
         options = options.require_tls(true);
