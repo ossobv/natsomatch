@@ -20,17 +20,27 @@ impl Sink {
         let js_subjects: Vec<String> = sink.subject_any.split(',').map(|s| s.to_string()).collect();
 
         println!("Setting up JetStream stream {} {:?} ...", sink.name, js_subjects);
-        let stream_info = js.get_or_create_stream(async_nats::jetstream::stream::Config {
+        let stream_info_res = js.get_or_create_stream(async_nats::jetstream::stream::Config {
             name: sink.name.to_string(),
             //max_bytes: 5 * 1024 * 1024 * 1024,
             //storage: StorageType::Memory,
             subjects: js_subjects,
             ..Default::default()
-        }).await?;
+        }).await;
 
-        println!("Connected to NATS server SINK+JS {:?}", js);
-        println!("- stream info: {:?}", stream_info);
-        println!("");
+        match stream_info_res {
+            Ok(stream_info) => {
+                println!("Connected to NATS server SINK+JS {:?}", js);
+                println!("- stream info: {:?}", stream_info);
+                println!("");
+            },
+            Err(e) => {
+                println!("Stream setup failed on NATS server SINK+JS {:?}", js);
+                println!("- error: {:?}", e);
+                println!("- continuing anyway...");
+                println!("");
+            },
+        }
 
         Ok(Sink {
             jsctx: js,
