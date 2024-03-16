@@ -13,10 +13,25 @@ WORKDIR /src/nats2jetstream
 RUN cargo --version
 RUN cargo install cargo-auditable cargo-audit
 
-COPY . /src/nats2jetstream
+# Copy prerequisites for cargo update/fetch
+COPY Cargo.lock Cargo.toml /src/nats2jetstream/
+COPY benches /src/nats2jetstream/benches
+COPY lib /src/nats2jetstream/lib
+COPY src/lib.rs /src/nats2jetstream/src/lib.rs
 
+# Update/fetch
 RUN cargo update --dry-run --locked
 RUN cargo fetch --locked --verbose
+
+# Waiting on https://github.com/rust-lang/cargo/issues/2644
+# Then we could do a pre-build before adding most of our sources.
+#RUN GIT_VERSION=irrelevant cargo auditable build --locked --features=version-from-env \
+#      --release --target x86_64-unknown-linux-musl
+
+# Copy the rest of the source
+COPY . /src/nats2jetstream
+#RUN cargo update --dry-run --locked
+#RUN cargo fetch --locked --verbose
 #RUN rustup target add x86_64-unknown-linux-musl
 
 ARG GIT_VERSION
