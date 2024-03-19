@@ -21,6 +21,7 @@ TODO
 
 ☐  Small stuff:
 
+- Also count average message length.
 - Log/info when starting.
 - Log/info when stopping.
 - Add a buffer for unique-ids so we can detect and error if were generating dupe unique ids.
