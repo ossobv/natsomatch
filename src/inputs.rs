@@ -25,7 +25,7 @@ pub struct Input {
 impl Input {
     pub async fn from_config(input: &config_parser::NatsConfig) -> Result<Input, Box<dyn std::error::Error>> {
         println!("Connecting to NATS (input) {} ...", input.server);
-        let nc_in = misc_nats::connect("nats2jetstream-rs-nats-input", &input.server, &input.tls).await?;
+        let nc_in = misc_nats::connect("nats2jetstream-rs-nats-input", &input.server, &input.tls, &input.auth).await?;
         let subscription = nc_in.subscribe(input.subject.to_subject()).await?;
 
         println!("Connected to NATS server INPUT+SUB {:?}", nc_in);

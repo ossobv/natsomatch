@@ -13,7 +13,7 @@ pub struct Sink {
 impl Sink {
     pub async fn from_config(sink: &config_parser::JetStreamConfig) -> Result<Sink, Box<dyn Error>> {
         println!("Connecting to NATS (sink) {} ...", sink.server);
-        let nc_out = misc_nats::connect("nats2jetstream-rs-jetstream-sink", &sink.server, &sink.tls).await?;
+        let nc_out = misc_nats::connect("nats2jetstream-rs-jetstream-sink", &sink.server, &sink.tls, &sink.auth).await?;
         let js = async_nats::jetstream::new(nc_out);
 
         // XXX: move to configparser

@@ -58,6 +58,7 @@ Configuration for the Rust version:
     [sink.my_jetstream]
     # Output target
     jetstream.server = 'nats://nats.example.com:4222'
+    #jetstream.auth = { username = 'derek', password = 's3cr3t!' }
     jetstream.name = 'bulk'
     jetstream.subject_tpl = 'bulk.section.{section}'
     # Server certificate validation (tls.server_name is not working)
