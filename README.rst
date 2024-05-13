@@ -17,8 +17,6 @@ TODO
 - explain how to check healthz and on which port it's listening
 - explain that we currently need "my_nats" and "my_jetstream" as-is
 
-☐  Remove crazy Box<str> and replace with String.
-
 ☐  Pod termination takes too long. Does a kill/term signal not get picked up
    quickly?
 
@@ -123,3 +121,17 @@ The built binary (if built using ``cargo auditable build``) includes a
           "dependencies": [
             3,
     ...
+
+
+-----------
+Rust idioms
+-----------
+
+* ``String vs. Box<str>``: don't use ``Box<str>`` to make the string
+  immutable or try to save a uint. Only use it if you have many many strings.
+  (Similarly: see ``Box<[T]>`` vs. ``Vec<T>``.)
+
+* ``into/to_string/to_owned``: ``to_string`` is to get a human
+  representation of something; ``to_owned`` is for converting a
+  ``&String`` (or maybe a ``&str``) to a copy/clone; ``into`` is for
+  conversion (``String`` to ``PathBuf``, ``&str`` to ``String``).
