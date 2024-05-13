@@ -8,12 +8,32 @@ persistent NATS JetStream.
 TODO
 ----
 
-☐  Add JetStream target/sink configuration?
+☐  Explain setup:
+
+- one or more pods
+- configuration as toml seen below
+- manual Sink setup using nats cli ...
+- explain that tls.server_name is not working right now
+- explain how to check healthz and on which port it's listening
+- explain that we currently need "my_nats" and "my_jetstream" as-is
+
+☐  Remove crazy Box<str> and replace with String.
+
+☐  Pod termination takes too long. Does a kill/term signal not get picked up
+   quickly?
+
+☐  Log startup.
+
+☐  Log shutdown.
+
+☐  Remove JetStream target/sink config. No auto-creation. Explain how to create one instead.
 
 - We probably want: replicas 3.
 - Maybe: allow-direct.
 - ``{"max_bytes": -1, "max_messages": -1, "discard": "Old", "max_age": 0, "max_message_size": -1, "no_ack": false}``
 - See more here: https://docs.nats.io/nats-concepts/jetstream/streams
+
+☐  See if we can add filters to remove useless messages. We'll want to check some live data here.
 
 ☐  Add configurable bind address for /healthz server. Use a ping/pong test on input/sink too?
 
@@ -22,8 +42,6 @@ TODO
 ☐  Small stuff:
 
 - Also count average message length.
-- Log/info when starting.
-- Log/info when stopping.
 - Add a buffer for unique-ids so we can detect and error if were generating dupe unique ids.
 
 ☐  Check and fix behaviour on NATS/subscription disconnect/error.
