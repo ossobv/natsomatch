@@ -16,7 +16,7 @@ impl Input {
 
         println!("Connected to NATS server INPUT+SUB {:?}", nc_in);
         println!("- subscription ({}): {:?}", input.subject, subscription);
-        println!("");
+        println!();
 
         Ok(Input {
             sub: subscription,

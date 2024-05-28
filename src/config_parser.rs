@@ -54,7 +54,7 @@ fn parse_input_config(config: &Value) -> NatsConfig {
     match input_section.get("nats") {
         Some(nats) => {
             server = nats.get("server").and_then(|v| v.as_str()).unwrap_or(MISSING_VALUE).to_string();
-            auth = nats.get("auth").map(|auth_section| parse_auth_config(auth_section));
+            auth = nats.get("auth").map(parse_auth_config);
             subject = nats.get("subject").and_then(|v| v.as_str()).unwrap_or(MISSING_VALUE).to_string();
         },
         None => {
@@ -64,13 +64,13 @@ fn parse_input_config(config: &Value) -> NatsConfig {
         },
     };
 
-    let tls = input_section.get("tls").map(|tls_section| parse_tls_config(tls_section));
+    let tls = input_section.get("tls").map(parse_tls_config);
 
     NatsConfig {
-        server: server,
-        auth: auth,
-        subject: subject,
-        tls: tls,
+        server,
+        auth,
+        subject,
+        tls,
     }
 }
 
@@ -85,7 +85,7 @@ fn parse_sink_config(config: &Value) -> JetStreamConfig {
     match sink_section.get("jetstream") {
         Some(jetstream) => {
             server = jetstream.get("server").and_then(|v| v.as_str()).unwrap_or(MISSING_VALUE).into();
-            auth = jetstream.get("auth").map(|auth_section| parse_auth_config(auth_section));
+            auth = jetstream.get("auth").map(parse_auth_config);
             name = jetstream.get("name").and_then(|v| v.as_str()).unwrap_or(MISSING_VALUE).into();
             subject_tpl = jetstream.get("subject_tpl").and_then(|v| v.as_str()).unwrap_or(MISSING_VALUE).into();
         },
@@ -97,7 +97,7 @@ fn parse_sink_config(config: &Value) -> JetStreamConfig {
         },
     };
 
-    let tls = sink_section.get("tls").map(|tls_section| parse_tls_config(tls_section));
+    let tls = sink_section.get("tls").map(parse_tls_config);
 
     // Copy the "abc.{def}" template and turn into "abc.*"
     let mut subject_any: String = subject_tpl.clone();
@@ -106,12 +106,12 @@ fn parse_sink_config(config: &Value) -> JetStreamConfig {
     }
 
     JetStreamConfig {
-        server: server,
-        auth: auth,
-        name: name,
-        subject_any: subject_any,
-        subject_tpl: subject_tpl,
-        tls: tls,
+        server,
+        auth,
+        name,
+        subject_any,
+        subject_tpl,
+        tls,
     }
 }
 
@@ -120,8 +120,8 @@ fn parse_auth_config(auth_section: &Value) -> NatsAuth {
     let password = auth_section.get("password").and_then(|v| v.as_str()).map(String::from);
 
     NatsAuth {
-        username: username,
-        password: password,
+        username,
+        password,
     }
 }
 
@@ -132,10 +132,10 @@ fn parse_tls_config(tls_section: &Value) -> TlsConfig {
     let key_file = tls_section.get("key_file").and_then(|v| v.as_str()).map(String::from);
 
     TlsConfig {
-        server_name: server_name,
-        ca_file: ca_file,
-        cert_file: cert_file,
-        key_file: key_file,
+        server_name,
+        ca_file,
+        cert_file,
+        key_file,
     }
 }
 

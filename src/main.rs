@@ -107,11 +107,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
             Some(msg) => {
                 // Prepare
                 let prep_t0 = Instant::now();
-                let attrs: payload_parser::BytesAttributes;
-                match payload_parser::BytesAttributes::from_payload(&msg.payload) {
-                    Ok(ok) => { attrs = ok; },
+                let attrs = match payload_parser::BytesAttributes::from_payload(&msg.payload) {
+                    Ok(ok) => { ok },
                     Err(err) => { eprintln!("payload error: {}; {:?}", err, msg.payload); continue; },
-                }
+                };
                 let unique_id = attrs.get_unique_id();
                 let subject = subject_tpl.replace("{section}", attrs.get_section());
                 let prep_td = prep_t0.elapsed();

@@ -32,13 +32,13 @@ impl Sink {
             Ok(stream_info) => {
                 println!("Connected to NATS server SINK+JS {:?}", js);
                 println!("- stream info: {:?}", stream_info);
-                println!("");
+                println!();
             },
             Err(e) => {
                 println!("Stream setup failed on NATS server SINK+JS {:?}", js);
                 println!("- error: {:?}", e);
                 println!("- continuing anyway...");
-                println!("");
+                println!();
             },
         }
 

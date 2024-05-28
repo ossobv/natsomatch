@@ -20,8 +20,8 @@ pub struct HealthzService {
 impl HealthzService {
     pub fn create(period_stats: Arc<Mutex<stats::Stats>>, forever_stats: Arc<Mutex<stats::Stats>>) -> HealthzService {
         HealthzService {
-            period_stats: period_stats,
-            forever_stats: forever_stats,
+            period_stats,
+            forever_stats,
         }
     }
 }

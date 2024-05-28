@@ -8,17 +8,14 @@ pub async fn connect(name: &str, server: &str, maybe_tls: &Option<config_parser:
 
     if let Some(tls) = maybe_tls {
         options = options.require_tls(true);
-        if let Some(_) = &tls.server_name {
+        if tls.server_name.is_some() {
             eprintln!("warning: tls.server_name is not implemented");
         }
         if let Some(ca_file) = &tls.ca_file {
             options = options.add_root_certificates(ca_file.into());
         }
-        match (&tls.cert_file, &tls.key_file) {
-            (Some(cert), Some(key)) => {
-                options = options.add_client_certificate(cert.into(), key.into());
-            },
-            _ => {},
+        if let (Some(cert), Some(key)) = (&tls.cert_file, &tls.key_file) {
+            options = options.add_client_certificate(cert.into(), key.into());
         }
     }
 
@@ -33,5 +30,5 @@ pub async fn connect(name: &str, server: &str, maybe_tls: &Option<config_parser:
         }
     }
 
-    return options.connect(server).await;
+    options.connect(server).await
 }
