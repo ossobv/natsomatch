@@ -17,9 +17,6 @@ TODO
 - explain how to check healthz and on which port it's listening
 - explain that we currently need "my_nats" and "my_jetstream" as-is
 
-☐  Pod termination takes too long. Does a kill/term signal not get picked up
-   quickly?
-
 ☐  Log startup.
 
 ☐  Log shutdown.

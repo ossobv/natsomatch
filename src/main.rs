@@ -31,6 +31,29 @@ const STATS_EVERY: u64 = 60;  // show stats every N seconds
 const HEALTHZ_BINDADDR: &str = "0.0.0.0:3000";
 
 
+/// Waits for a signal that requests a graceful shutdown, like SIGTERM
+/// or SIGINT.
+#[cfg(unix)]
+async fn wait_for_signal_impl() {
+    use tokio::signal::unix::{signal, SignalKind};
+
+    // Infos here:
+    // https://www.gnu.org/software/libc/manual/html_node/Termination-Signals.html
+    let mut signal_terminate = signal(SignalKind::terminate()).unwrap();
+    let mut signal_interrupt = signal(SignalKind::interrupt()).unwrap();
+
+    tokio::select! {
+        _ = signal_terminate.recv() => {
+            eprintln!("Received SIGTERM.");
+            std::process::exit(0);
+        },
+        _ = signal_interrupt.recv() => {
+            eprintln!("Received SIGINT.");
+            std::process::exit(0);
+        }
+    };
+}
+
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -65,6 +88,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let period_stats_stats = Arc::new(Mutex::new(stats::Stats::new()));
     let period_stats_healthz = period_stats_stats.clone();
     let period_stats_io = period_stats_stats.clone();
+
+    // Start a background task for fast stoppage
+    tokio::spawn(async move { wait_for_signal_impl().await; });
 
     // Start a background task for periodic updates
     let stats_task = tokio::spawn(async move {
