@@ -19,6 +19,7 @@ impl Sink {
         // XXX: move to configparser
         let js_subjects: Vec<String> = sink.subject_any.split(',').map(|s| s.to_string()).collect();
 
+        /*
         println!("Setting up JetStream stream {} {:?} ...", sink.name, js_subjects);
         let stream_info_res = js.get_or_create_stream(async_nats::jetstream::stream::Config {
             name: sink.name.to_string(),
@@ -27,6 +28,10 @@ impl Sink {
             subjects: js_subjects,
             ..Default::default()
         }).await;
+        */
+
+        println!("Connecting to existing JetStream stream {} {:?} ...", sink.name, js_subjects);
+        let stream_info_res = js.get_stream(sink.name.to_string()).await;
 
         match stream_info_res {
             Ok(stream_info) => {
@@ -37,8 +42,8 @@ impl Sink {
             Err(e) => {
                 println!("Stream setup failed on NATS server SINK+JS {:?}", js);
                 println!("- error: {:?}", e);
-                println!("- continuing anyway...");
                 println!();
+                panic!("aborting");
             },
         }
 

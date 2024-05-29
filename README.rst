@@ -1,12 +1,71 @@
 nats2jetstream
 ==============
 
-Take messages from plain NATS subscription and feed them into a
-persistent NATS JetStream.
+Take messages from plain *NATS* subscription and feed them into a
+persistent *NATS JetStream*.
+
+* Setup HOWTO:
+
+  - Make sure there is a JetStream stream to read from. If the data is
+    published without a JetStream, create one automatically::
+
+      nats stream add --subjects=default.nats.vector \
+        --description='All messages from vector' \
+        --storage=file --replicas=3 \
+        --retention=limits --discard=old --max-bytes=20GiB --max-msgs=-1 \
+        --max-msgs-per-subject=-1 --max-age=-1 --max-msg-size=-1 \
+        --dupe-window=60s --no-allow-rollup --no-deny-delete \
+        --no-deny-purge --allow-direct bulk_by_section
+
+  - Skip the rest below. We don't need to do anything. The above line already
+    takes care of the original goal of this project.
+
+  - Next, we need a project that does filtering and rewriting into
+    different streams/subjects.
+
+  - Create a consumer, manually::
+
+      nats consumer add --pull --deliver=all --ack=explicit \
+        --replay=instant --filter= --max-deliver=-1 --max-pending=0 \
+        --no-headers-only --backoff=none \
+        bulk_unfiltered bulk_unfiltered_consumer
+
 
 ----
 TODO
 ----
+
+☐  Rename project from nats2jetstream to nats-o-match.
+
+☐  Hardcode filtering extraction rules (for now?).
+
+- {tenant}  .attributes.tenant <string>
+- {section} .attributes.section <string>
+- {timens}  .attributes.time_unix_nano <digits>
+- {cluster} .attributes.cluster <string> (optional)
+- {systemd_unit} .attributes.systemd_unit (optional)
+- {host}    .attributes.host <string>
+- {message} .message
+- ({origin} = systemd_unit || filename (<- dots) || '{trans}.{syslog.fac}.{syslog.prio}.{syslog.tag}')
+                  ^- without dots, before first @
+
+☐  Hardcode matching rules (for now?):
+
+- haproxy -> "{origin}"
+
+  {systemd_unit} =^ haproxy@
+
+- nginx:
+
+  {filename} =^ /var/log/nginx/
+
+- devnull:
+
+  - ???
+
+- the_rest:
+
+  - *
 
 ☐  Explain setup:
 
@@ -20,13 +79,6 @@ TODO
 ☐  Log startup.
 
 ☐  Log shutdown.
-
-☐  Remove JetStream target/sink config. No auto-creation. Explain how to create one instead.
-
-- We probably want: replicas 3.
-- Maybe: allow-direct.
-- ``{"max_bytes": -1, "max_messages": -1, "discard": "Old", "max_age": 0, "max_message_size": -1, "no_ack": false}``
-- See more here: https://docs.nats.io/nats-concepts/jetstream/streams
 
 ☐  See if we can add filters to remove useless messages. We'll want to check some live data here.
 

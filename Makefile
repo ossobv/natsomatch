@@ -18,4 +18,5 @@ debug:
 .PHONY: release
 release:
 	#cargo install cargo-auditable cargo-audit
-	cargo auditable build --release
+	#cargo auditable build --release
+	./build-docker.sh
