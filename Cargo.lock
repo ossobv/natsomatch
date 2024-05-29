@@ -835,6 +835,7 @@ dependencies = [
  "hyper",
  "hyper-util",
  "nats2jetstream-json",
+ "nats2jetstream-match",
  "tokio",
  "toml",
 ]
@@ -842,6 +843,13 @@ dependencies = [
 [[package]]
 name = "nats2jetstream-json"
 version = "0.1.3"
+
+[[package]]
+name = "nats2jetstream-match"
+version = "0.1.0"
+dependencies = [
+ "nats2jetstream-json",
+]
 
 [[package]]
 name = "nkeys"

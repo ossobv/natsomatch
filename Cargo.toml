@@ -33,6 +33,7 @@ criterion = "0.5"
 
 [dependencies]
 nats2jetstream-json = { path = "lib/json" }
+nats2jetstream-match = { path = "lib/match" }
 
 async-nats = "0.33"
 bytes = "1"
