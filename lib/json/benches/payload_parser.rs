@@ -35,16 +35,16 @@ fn criterion_benchmark(c: &mut Criterion) {
         ,"timestamp":"2024-02-19T13:29:32.636882340Z"}"#;
 
     c.bench_function("BytesAttributes::from_payload(NO_TS_JSB)", |b| {
-        b.iter(|| payload_parser::BytesAttributes::from_payload(black_box(NO_TS_JSB)).unwrap().get_unique_id())
+        b.iter(|| { payload_parser::BytesAttributes::from_payload(black_box(NO_TS_JSB)).unwrap().get_section(); })
     });
     c.bench_function("BytesAttributes::from_payload(TS_JSB)", |b| {
-        b.iter(|| payload_parser::BytesAttributes::from_payload(black_box(TS_JSB)).unwrap().get_unique_id())
+        b.iter(|| { payload_parser::BytesAttributes::from_payload(black_box(TS_JSB)).unwrap().get_section(); })
     });
     c.bench_function("StringAttributes::from_payload(NO_TS_JSB)", |b| {
-        b.iter(|| payload_parser::StringAttributes::from_payload(black_box(NO_TS_JSB)).unwrap().get_unique_id())
+        b.iter(|| { payload_parser::StringAttributes::from_payload(black_box(NO_TS_JSB)).unwrap().get_section(); })
     });
     c.bench_function("StringAttributes::from_payload(TS_JSB)", |b| {
-        b.iter(|| payload_parser::StringAttributes::from_payload(black_box(TS_JSB)).unwrap().get_unique_id())
+        b.iter(|| { payload_parser::StringAttributes::from_payload(black_box(TS_JSB)).unwrap().get_section(); })
     });
 }
 

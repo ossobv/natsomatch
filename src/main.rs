@@ -131,21 +131,26 @@ async fn main() -> Result<(), Box<dyn Error>> {
         let subject_tpl = app_config.sink.subject_tpl.to_string();
         match input.next().await {
             Some(msg) => {
-                // Prepare
+                // Prepare: parse json
                 let prep_t0 = Instant::now();
                 let attrs = match payload_parser::BytesAttributes::from_payload(&msg.payload) {
                     Ok(ok) => { ok },
                     Err(err) => { eprintln!("payload error: {}; {:?}", err, msg.payload); continue; },
                 };
-                let unique_id = attrs.get_unique_id();
+
+                // Prepare: select destination, make subject
                 let subject = subject_tpl.replace("{section}", attrs.get_section());
+
                 let prep_td = prep_t0.elapsed();
 
                 // Publish
+                // FIXME: publishing should be done in a separate handler so we can continue
+                // parsing the others asynchronously? Useful if we'd publish to multiple locations.
+
                 let pub_t0 = Instant::now();
-                match sink.publish_unique(subject, &unique_id, msg.payload).await {
+                match sink.publish_unique(subject, "FIXME-uniqueid", msg.payload).await {
                     Ok(_maybe_ack) => {},
-                    Err(err) => { eprintln!("publish error: {}; {}", err, unique_id); continue; },
+                    Err(err) => { eprintln!("publish error: {}", err); continue; },
                 }
                 let pub_td = pub_t0.elapsed();
 

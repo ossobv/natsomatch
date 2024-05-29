@@ -38,6 +38,9 @@
 ///
 
 
+///
+/// The data is guaranteed to be JSON, so we should not panic here.
+///
 fn force_string(data: &[u8]) -> &str {
     std::str::from_utf8(data).unwrap()
 }
@@ -48,10 +51,14 @@ fn force_string(data: &[u8]) -> &str {
 #[derive(Debug)]
 #[derive(PartialEq)]
 pub struct BytesAttributes<'a> {
-    pub hostname: &'a [u8],
+    pub tenant: &'a [u8],
     pub section: &'a [u8],
-    pub rep_timestamp: &'a [u8],
-    pub obs_timestamp: &'a [u8],
+    pub timens: &'a [u8],
+    pub hostname: &'a [u8],
+    pub cluster: &'a [u8],          // optional
+    pub systemd_unit: &'a [u8],     // optional
+    pub filename: &'a [u8],         // optional
+    pub message: &'a [u8],
 }
 
 ///
@@ -61,10 +68,14 @@ pub struct BytesAttributes<'a> {
 #[derive(Debug)]
 #[derive(PartialEq)]
 pub struct StringAttributes {
-    pub hostname: String,
+    pub tenant: String,
     pub section: String,
-    pub rep_timestamp: String,
-    pub obs_timestamp: String,
+    pub timens: String,
+    pub hostname: String,
+    pub cluster: String,        // optional
+    pub systemd_unit: String,   // optional
+    pub filename: String,       // optional
+    pub message: String,
 }
 
 
@@ -73,54 +84,44 @@ impl<'a> BytesAttributes<'a> {
         Self::consume_special_root(payload)
     }
 
-    pub fn get_unique_id(&self) -> String {
-        format!(
-            "T{}O{}H{}", force_string(self.rep_timestamp),
-            force_string(self.obs_timestamp), force_string(self.hostname))
-    }
-
     pub fn get_section(&self) -> &str {
         force_string(self.section)
     }
 
     /// Parse the entire payload.
     fn consume_special_root(payload: &'a [u8]) -> Result<BytesAttributes, &str> {
-        let zeroptr = payload.as_ptr();
-        let isunset = |slice: &[u8]| { slice.as_ptr() == zeroptr };
+        let mut bingo: u32 = 0; // 1(attributes) + 2(message)
 
-        let mut hostname: &'a [u8] = &payload[0..0];
-        let mut section: &'a [u8] = &payload[0..0];
-        let mut rep_timestamp: &'a [u8] = &payload[0..0];
-        let mut obs_timestamp: &'a [u8] = &payload[0..0];
+        let mut partial = BytesAttributes {
+            tenant: &payload[0..0],
+            section: &payload[0..0],
+            timens: &payload[0..0],
+            hostname: &payload[0..0],
+            cluster: &payload[0..0],         // optional
+            systemd_unit: &payload[0..0],    // optional
+            filename: &payload[0..0],        // optional
+            message: &payload[0..0],
+        };
 
         let mut i: usize = 0usize;
 
         Self::consume_token(payload, &mut i, b'{')?;
-        while (isunset(hostname) || isunset(section) || isunset(rep_timestamp)
-                    || isunset(obs_timestamp))
-                && i < payload.len() {
-
+        while i < payload.len() {
             let key = Self::consume_key(payload, &mut i)?;
             Self::consume_token(payload, &mut i, b':')?;
+
             if key == b"attributes" {
-                Self::consume_special_attributes(
-                    payload, &mut i, &mut hostname, &mut section,
-                    &mut rep_timestamp, &mut obs_timestamp)?;
+                Self::consume_special_attributes(payload, &mut i, &mut partial)?;
                 //println!("[{}] {} from_payload after special", i, payload[i]);
-            } else if key == b"timestamp" {
-                // This is only used if the "attributes" dict has no
-                // "time_unix_nano". Otherwise the
-                // consume_special_attributes() already completes the
-                // while condition.
-                rep_timestamp = Self::consume_string(payload, &mut i)?;
-            } else if key == b"observed_timestamp" {
-                // This is only used if the "attributes" dict has no
-                // "observed_time_unix_nano". Otherwise the
-                // consume_special_attributes() already completes the
-                // while condition.
-                obs_timestamp = Self::consume_string(payload, &mut i)?;
+               bingo |= 1;
+            } else if key == b"message" {
+                partial.message = Self::consume_string(payload, &mut i)?;
+               bingo |= 2;
             } else {
                 Self::consume_value(payload, &mut i)?;
+            }
+            if bingo == 3 {
+                break;
             }
             let ch = Self::skip_whitespace(payload, &mut i)?;
             //println!("[{}] {} from_payload in root", i, ch);
@@ -133,65 +134,51 @@ impl<'a> BytesAttributes<'a> {
             }
         }
 
-        if isunset(hostname) || isunset(section) || isunset(rep_timestamp) || isunset(obs_timestamp) {
-            return Err("one or more missing attributes in from_payload");
+        if bingo != 3 {
+            return Err("attributes or message not found in from_payload");
         }
 
-        Ok(BytesAttributes {
-            hostname: hostname,
-            section: section,
-            rep_timestamp: rep_timestamp,
-            obs_timestamp: obs_timestamp,
-        })
+        Ok(partial)
     }
 
     /// Parse the attributes dict where the relevant information it.
     fn consume_special_attributes(
             payload: &'a [u8],
             i: &mut usize,
-            hostname: &mut &'a [u8],
-            section: &mut &'a [u8],
-            rep_timestamp: &mut &'a [u8],
-            obs_timestamp: &mut &'a [u8]
+            partial: &mut BytesAttributes<'a>,
             ) -> Result<(), &'static str> {
 
         Self::consume_token(payload, i, b'{')?;
         //let begin = *i;
 
-        // We use this check instead of checking whether hostname,
-        // section and timestamp all have a non-0 start. That way, the
-        // timestamp from the attributes will get precedence over the
-        // timestamp from the root json dict.
-        let mut bingo: u32 = 0; // 1 /* hostname */ + 2 /* section */ + 4 /* rep_timestamp */ + 8 /* obs_timestamp */;
-
         while *i < payload.len() {
             let key = Self::consume_key(payload, i)?;
             Self::consume_token(payload, i, b':')?;
             match key {
-                b"host" => {
-                    *hostname = Self::consume_string(payload, i)?;
-                    bingo |= 1;
+                b"tenant" => {
+                    partial.tenant = Self::consume_string(payload, i)?;
                 },
                 b"section" => {
-                    *section = Self::consume_string(payload, i)?;
-                    bingo |= 2;
+                    partial.section = Self::consume_string(payload, i)?;
                 },
                 b"time_unix_nano" => {
-                    *rep_timestamp = Self::consume_other(payload, i)?;
-                    bingo |= 4;
+                    partial.timens = Self::consume_other(payload, i)?;
                 },
-                b"observed_time_unix_nano" => {
-                    *obs_timestamp = Self::consume_other(payload, i)?;
-                    bingo |= 8;
+                b"host" => {
+                    partial.hostname = Self::consume_string(payload, i)?;
+                },
+                b"cluster" => {
+                    partial.cluster = Self::consume_string(payload, i)?;
+                },
+                b"systemd_unit" => {
+                    partial.systemd_unit = Self::consume_string(payload, i)?;
+                },
+                b"filename" => {
+                    partial.filename = Self::consume_string(payload, i)?;
                 },
                 _ => {
                     Self::consume_value(payload, i)?;
                 }
-            }
-
-            // Quick exit if we have all needed values.
-            if bingo == 15 {
-                return Ok(());
             }
 
             let ch = Self::skip_whitespace(payload, i)?;
@@ -242,7 +229,7 @@ impl<'a> BytesAttributes<'a> {
             *i += 1;
             return Ok(());
         }
-        return Err("expected token, found something else")
+        Err("expected token, found something else")
     }
 
     /// Expect any json value (string, non-string, list, dict) (after optional whitespace).
@@ -357,44 +344,40 @@ impl StringAttributes {
     pub fn from_payload(payload: &[u8]) -> Result<StringAttributes, &str> {
         let root: serde_json::Value = serde_json::from_slice(payload).map_err(|_| "json parse error")?;
 
-        let hostname: String;
+        let tenant: String;
         let section: String;
-        let rep_timestamp: String;
-        let obs_timestamp: String;
+        let timens: String;
+        let hostname: String;
+        let cluster: String;        // optional
+        let systemd_unit: String;   // optional
+        let filename: String;       // optional
+        let message: String;
 
         if let Some(attributes) = root.get("attributes") {
-            hostname = attributes.get("host").and_then(|v| v.as_str()).map(|s| s.to_string())
-                .ok_or("host parse error")?;
-            section = attributes.get("section").and_then(|v| v.as_str()).map(|s| s.to_string())
-                .ok_or("section parse error")?;
-            if let Some(ts) = attributes.get("time_unix_nano") {
-                rep_timestamp = ts.as_i64().map(|s| s.to_string())
-                    .ok_or("nano timestamp parse error")?;
-            } else {
-                rep_timestamp = root.get("timestamp").and_then(|v| v.as_str()).map(|s| s.to_string())
-                    .ok_or("timestamp parse error")?;
-            }
-            if let Some(ts) = attributes.get("observed_time_unix_nano") {
-                obs_timestamp = ts.as_i64().map(|s| s.to_string())
-                    .ok_or("nano observed timestamp parse error")?;
-            } else {
-                obs_timestamp = root.get("observed_timestamp").and_then(|v| v.as_str()).map(|s| s.to_string())
-                    .ok_or("observed_timestamp parse error")?;
-            }
+            tenant = attributes.get("tenant").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            section = attributes.get("section").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            timens = attributes.get("time_unix_nano").and_then(|v| v.as_i64()).unwrap_or(0).to_string();
+            hostname = attributes.get("host").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            cluster = attributes.get("cluster").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            systemd_unit = attributes.get("systemd_unit").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            filename = attributes.get("filename").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            message = attributes.get("message").and_then(|v| v.as_str()).unwrap_or("").to_string();
         } else {
             return Err("one or more attributes not found");
         }
 
-        Ok(StringAttributes {
-            hostname: hostname.to_string(),
-            section: section.to_string(),
-            rep_timestamp: rep_timestamp.to_string(),
-            obs_timestamp: obs_timestamp.to_string(),
-        })
-    }
+        // FIXME: check the non-optional ones?
 
-    pub fn get_unique_id(&self) -> String {
-        format!("T{}O{}H{}", self.rep_timestamp, self.obs_timestamp, self.hostname)
+        Ok(StringAttributes {
+            tenant,
+            section,
+            timens,
+            hostname,
+            cluster,
+            systemd_unit,
+            filename,
+            message,
+        })
     }
 
     pub fn get_section(&self) -> &str {
@@ -419,40 +402,30 @@ pub fn get_section_fast(payload: &[u8]) -> &str {
     if &payload[0..15] != br#"{"attributes":{"# {
         return "ERR_bad_start";
     }
-    let section_start: usize;
-    match memmem(&payload[15..], br#""section":""#) {
-        Some(idx) => { section_start = 15 + idx + 11; },
+    let section_start = match memmem(&payload[15..], br#""section":""#) {
+        Some(idx) => { 15 + idx + 11 },
         None => { return "ERR_no_section"; },
-    }
-    let section_end: usize;
-    match memchr(&payload[section_start..], b'"') {
-        Some(idx) => { section_end = section_start + idx; }
+    };
+    let section_end = match memchr(&payload[section_start..], b'"') {
+        Some(idx) => { section_start + idx }
         None => { return "ERR_no_trailing_dq"; },
-    }
+    };
     let slice = &payload[section_start..section_end];
     force_string(slice)
 }
 
+///
+/// Returns subsequence index i or None if not found
+///
 fn memmem(haystack: &[u8], needle: &[u8]) -> Option<usize> {
-    // Iterate through the bytes of the haystack
-    for i in 0..=(haystack.len() - needle.len()) {
-        // Compare the bytes starting from index i
-        if &haystack[i..i + needle.len()] == needle {
-            return Some(i); // Return the index if the subsequence is found
-        }
-    }
-    None // Return None if the subsequence is not found
+    (0..=(haystack.len() - needle.len())).find(|&i| &haystack[i..i + needle.len()] == needle)
 }
 
+///
+/// Returns subsequence index i or None if not found
+///
 fn memchr(haystack: &[u8], needle: u8) -> Option<usize> {
-    // Iterate through the bytes of the haystack
-    for i in 0..=(haystack.len() - 1) {
-        // Compare the byte starting from index i
-        if haystack[i] == needle {
-            return Some(i); // Return the index if the character is found
-        }
-    }
-    None // Return None if the subsequence is not found
+    (0..=(haystack.len() - 1)).find(|&i| haystack[i] == needle)
 }
 
 
@@ -476,7 +449,7 @@ mod tests {
         ,"timestamp":"2024-02-19T13:29:32.636882340Z"}"#;
 
     static REORDERED_JSB: &[u8] = br#"
-        {"message":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        {"message":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
         ,"message1":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
         ,"message2":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
         ,"message3":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
@@ -494,60 +467,27 @@ mod tests {
          ,"job":"loki","systemd_unit":"ssh.service"
          ,"time_unix_nano":1708349372636882340}}"#;
 
-    static NO_TIME_NANO_JSB: &[u8] = br#"
-        {"attributes":{"filename":"/var/log/auth.log","host":"mgmt.example"
-         ,"section":"SCT","job":"loki","systemd_unit":"ssh.service"}
-        ,"message":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-        ,"observed_timestamp":"2024-02-19T13:29:32.637827462Z"
-        ,"somedict":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21]
-        ,"timestamp":"2024-02-19T13:29:32.636882340Z"}"#;
-
     #[cfg(feature = "benchmark")]
     #[test]
     fn test_safe() {
         let attrs = StringAttributes::from_payload(EXPECTED_JSB).expect("parse error");
         assert_eq!(attrs.hostname, r#"mgmt.example"#);
-        assert_eq!(attrs.rep_timestamp, r#"1708349372636882340"#);
-        assert_eq!(attrs.obs_timestamp, r#"1708349372637827462"#);
+        assert_eq!(attrs.timens, r#"1708349372636882340"#);
         assert_eq!(attrs.get_section(), "SCT");
-        assert_eq!(attrs.get_unique_id(), "T1708349372636882340O1708349372637827462Hmgmt.example");
 
         let attrs2 = StringAttributes::from_payload(REORDERED_JSB).expect("parse error");
         assert_eq!(attrs, attrs2);
-    }
-
-    #[cfg(feature = "benchmark")]
-    #[test]
-    fn test_safe_ts_from_root() {
-        let attrs = StringAttributes::from_payload(NO_TIME_NANO_JSB).expect("parse error");
-        assert_eq!(attrs.hostname, r#"mgmt.example"#);
-        assert_eq!(attrs.rep_timestamp, r#"2024-02-19T13:29:32.636882340Z"#);
-        assert_eq!(attrs.obs_timestamp, r#"2024-02-19T13:29:32.637827462Z"#);
-        assert_eq!(attrs.get_section(), "SCT");
-        assert_eq!(attrs.get_unique_id(), "T2024-02-19T13:29:32.636882340ZO2024-02-19T13:29:32.637827462ZHmgmt.example");
     }
 
     #[test]
     fn test_fast() {
         let attrs = BytesAttributes::from_payload(EXPECTED_JSB).expect("parse error");
         assert_eq!(force_string(attrs.hostname), r#"mgmt.example"#);
-        assert_eq!(force_string(attrs.rep_timestamp), r#"1708349372636882340"#);
-        assert_eq!(force_string(attrs.obs_timestamp), r#"1708349372637827462"#);
+        assert_eq!(force_string(attrs.timens), r#"1708349372636882340"#);
         assert_eq!(attrs.get_section(), "SCT");
-        assert_eq!(attrs.get_unique_id(), "T1708349372636882340O1708349372637827462Hmgmt.example");
 
         let attrs2 = BytesAttributes::from_payload(REORDERED_JSB).expect("parse error");
         assert_eq!(attrs, attrs2);
-    }
-
-    #[test]
-    fn test_fast_ts_from_root() {
-        let attrs = BytesAttributes::from_payload(NO_TIME_NANO_JSB).expect("parse error");
-        assert_eq!(force_string(attrs.hostname), r#"mgmt.example"#);
-        assert_eq!(force_string(attrs.rep_timestamp), r#"2024-02-19T13:29:32.636882340Z"#);
-        assert_eq!(force_string(attrs.obs_timestamp), r#"2024-02-19T13:29:32.637827462Z"#);
-        assert_eq!(attrs.get_section(), "SCT");
-        assert_eq!(attrs.get_unique_id(), "T2024-02-19T13:29:32.636882340ZO2024-02-19T13:29:32.637827462ZHmgmt.example");
     }
 
     #[test]
