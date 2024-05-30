@@ -88,6 +88,10 @@ impl<'a> BytesAttributes<'a> {
         force_string(self.section)
     }
 
+    pub fn has_no_origin(&self) -> bool {
+        self.systemd_unit.len() == 0 && self.filename.len() == 0
+    }
+
     /// Parse the entire payload.
     fn consume_special_root(payload: &'a [u8]) -> Result<BytesAttributes, &str> {
         let mut bingo: u32 = 0; // 1(attributes) + 2(message)

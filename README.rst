@@ -33,12 +33,12 @@ persistent *NATS JetStream*.
 * Various subjects may have been configured in lib/src/log_matcher.rs. We'll
   need to create streams for those::
 
-    for tp in haproxy nginx k8s unknown; do
-        nats stream add --subjects="bulk.$tp.*" --description="Bulk $tp" \
+    for tp in execve haproxy nginx k8s unknown; do
+        nats stream add --subjects="bulk.$tp.>" --description="Bulk $tp" \
           --storage=file --replicas=3 --retention=limits --discard=old \
           --max-bytes=2GiB --max-msgs=-1 --max-msgs-per-subject=-1 \
           --max-age=-1 --max-msg-size=-1 --dupe-window=60s --no-allow-rollup \
-          --no-deny-delete --no-deny-purge --allow-direct bulk_$tp
+          --no-deny-delete --no-deny-purge --allow-direct bulk_match_$tp
     done
 
 
