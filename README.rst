@@ -74,7 +74,6 @@ TODO
 - manual Sink setup using nats cli ...
 - explain that tls.server_name is not working right now
 - explain how to check healthz and on which port it's listening
-- explain that we currently need "my_nats" and "my_jetstream" as-is
 
 ☐  Log startup.
 
@@ -109,28 +108,30 @@ Configuration for the Rust version:
 
 .. code-block:: toml
 
-    [input.my_nats]
+    [input]
     # Input source
     nats.server = 'nats://10.20.30.40:4222'
-    nats.subject = 'NS.log.vector-in'
     # Server certificate validation (tls.server_name is not working)
     tls.server_name = 'nats.local'
     tls.ca_file = './nats_ca.crt'
     # Client certificate
     tls.cert_file = './nats_client.crt'
     tls.key_file = './nats_client.key'
+    # Select manually made consumer from stream
+    nats.stream = 'bulk_unfiltered'
+    nats.consumer = 'bulk_unfiltered_consumer'
 
-    [sink.my_jetstream]
+    [sink]
     # Output target
-    jetstream.server = 'nats://nats.example.com:4222'
-    #jetstream.auth = { username = 'derek', password = 's3cr3t!' }
-    jetstream.name = 'bulk'
-    jetstream.subject_tpl = 'bulk.section.{section}'
+    nats.server = 'nats://nats.example.com:4222'
+    nats.auth = { username = 'derek', password = 's3cr3t!' }
     # Server certificate validation (tls.server_name is not working)
     tls.ca_file = '/etc/ssl/certs/ca-certificates.crt'
     # Client certificate
-    tls.cert_file = './nats_client.crt'
-    tls.key_file = './nats_client.key'
+    #tls.cert_file = './nats_client.crt'
+    #tls.key_file = './nats_client.key'
+    # No need to set jetstream name or subjects. The subject generation is
+    # hardcoded for now, based on the message.
 
 
 -----------------------

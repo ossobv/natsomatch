@@ -11,6 +11,7 @@ use tokio::net::TcpListener;
 use tokio::time::sleep;
 
 use nats2jetstream_json::payload_parser;
+use nats2jetstream_match::log_matcher;
 
 // Either here or in lib.. depending on whether this is a lib or an app.
 mod config_parser;
@@ -128,46 +129,48 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     // Start the main task
     loop {
-        let subject_tpl = app_config.sink.subject_tpl.to_string();
-        match input.next().await {
-            Some(msg) => {
-                // Prepare: parse json
-                let prep_t0 = Instant::now();
-                let attrs = match payload_parser::BytesAttributes::from_payload(&msg.payload) {
-                    Ok(ok) => { ok },
-                    Err(err) => { eprintln!("payload error: {}; {:?}", err, msg.payload); continue; },
-                };
+//        let consumer = input.stream.get_consumer(&input.config.stream).await?;
+//
+//        let mut messages = consumer.messages().await?.take(100);
+//
+        while let Some(Ok(msg)) = input.next().await {
+            // Prepare/parse
+            let prep_t0 = Instant::now();
+            let attrs = match payload_parser::BytesAttributes::from_payload(&msg.payload) {
+                Ok(ok) => { ok },
+                Err(err) => { eprintln!("payload error: {}; {:?}", err, msg.payload); continue; },
+            };
+            let match_ = match log_matcher::Match::from_attributes(&attrs) {
+                Ok(ok) => { ok },
+                Err(err) => { eprintln!("match error: {}; {:?}", err, msg.payload); continue; },
+            };
+            let prep_td = prep_t0.elapsed();
 
-                // Prepare: select destination, make subject
-                let subject = subject_tpl.replace("{section}", attrs.get_section());
-
-                let prep_td = prep_t0.elapsed();
-
-                // Publish
-                // FIXME: publishing should be done in a separate handler so we can continue
-                // parsing the others asynchronously? Useful if we'd publish to multiple locations.
-
-                let pub_t0 = Instant::now();
-                match sink.publish_unique(subject, "FIXME-uniqueid", msg.payload).await {
-                    Ok(_maybe_ack) => {},
-                    Err(err) => { eprintln!("publish error: {}", err); continue; },
-                }
-                let pub_td = pub_t0.elapsed();
-
-                // Stats
-                let mut forever_stats = forever_stats_io.lock().expect("Lock forever_stats_io fail");
-                forever_stats.inc(prep_td, pub_td);
-                drop(forever_stats);
-
-                let mut period_stats = period_stats_io.lock().expect("Lock period_stats_io fail");
-                period_stats.inc(prep_td, pub_td);
-                drop(period_stats);
+            // Publish
+            // FIXME: publishing should be done in a separate handler so we can continue
+            // parsing the others asynchronously? Useful if we'd publish to multiple locations.
+            let pub_t0 = Instant::now();
+            match sink.publish(match_.subject, msg.payload.to_owned()).await {
+                Ok(maybe_ack) => {
+                    maybe_ack.await?;           // we got an ACK on publish
+                    msg.ack().await.unwrap();   // we send an ACK to our consumer (FIXME, error handling)
+                },
+                Err(err) => { eprintln!("publish error: {}", err); continue; },
             }
-            None => {
-                eprintln!("err??");
-                break
-            }
+            let pub_td = pub_t0.elapsed();
+
+            // Stats
+            let mut forever_stats = forever_stats_io.lock().expect("Lock forever_stats_io fail");
+            forever_stats.inc(prep_td, pub_td);
+            drop(forever_stats);
+
+            let mut period_stats = period_stats_io.lock().expect("Lock period_stats_io fail");
+            period_stats.inc(prep_td, pub_td);
+            drop(period_stats);
         }
+
+        // FIXME: Done? Because we processed all? We should sleep and restart.
+        break;
     }
 
     // XXX: does these work? is this needed?

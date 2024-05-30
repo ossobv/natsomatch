@@ -1,4 +1,4 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{criterion_group, criterion_main, Criterion};
 
 /*
 use async_nats::header::NATS_MESSAGE_ID;
@@ -24,7 +24,7 @@ fn test_header_reuse(headers: async_nats::HeaderMap, provided_id: &str) -> () {
 }
 */
 
-fn criterion_benchmark(c: &mut Criterion) {
+fn criterion_benchmark(_c: &mut Criterion) {
     /*
     let mut reusable_headers = async_nats::HeaderMap::new();
     reusable_headers.append(NATS_MESSAGE_ID, "0123456789abcdef0123456789abcdef");

@@ -15,7 +15,7 @@ Input:
         "log.file.path": "/var/log/nginx/acme.log",
         "loki.attribute.labels": "filename",
         "observed_time_unix_nano": 1716901443972772000,
-        "section": "section-dmz-cat4",
+        "section": "acme",
         "tenant": "wilee",
         "time_unix_nano": 1716901443972185600
       },
@@ -30,7 +30,6 @@ Output:
 
 .. code-block:: rust
 
-    Match{
-        consumer: "bulk_match_nginx",
-        subject: "nginx.wilee.section-dmz-cat4.lb1-zl-example-com"
+    Match {
+        subject: "bulk.nginx.wilee.acme.lb1-zl-example-com"
     }

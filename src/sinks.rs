@@ -11,47 +11,32 @@ pub struct Sink {
 }
 
 impl Sink {
-    pub async fn from_config(sink: &config_parser::JetStreamConfig) -> Result<Sink, Box<dyn Error>> {
-        println!("Connecting to NATS (sink) {} ...", sink.server);
-        let nc_out = misc_nats::connect("nats2jetstream-rs-jetstream-sink", &sink.server, &sink.tls, &sink.auth).await?;
+    pub async fn from_config(sink: &config_parser::SinkConfig) -> Result<Sink, Box<dyn Error>> {
+        let srv = &sink.natsconfig;
+
+        println!("Connecting to NATS (sink) {} ...", srv.server);
+        let nc_out = misc_nats::connect("nats2jetstream-rs-jetstream-sink", &srv.server, &srv.tls, &srv.auth).await?;
         let js = async_nats::jetstream::new(nc_out);
+        println!("Connected to NATS (sink) with JetStream context {:?}", js);
 
-        // XXX: move to configparser
-        let js_subjects: Vec<String> = sink.subject_any.split(',').map(|s| s.to_string()).collect();
-
-        /*
-        println!("Setting up JetStream stream {} {:?} ...", sink.name, js_subjects);
-        let stream_info_res = js.get_or_create_stream(async_nats::jetstream::stream::Config {
-            name: sink.name.to_string(),
-            //max_bytes: 5 * 1024 * 1024 * 1024,
-            //storage: StorageType::Memory,
-            subjects: js_subjects,
-            ..Default::default()
-        }).await;
-        */
-
-        println!("Connecting to existing JetStream stream {} {:?} ...", sink.name, js_subjects);
-        let stream_info_res = js.get_stream(sink.name.to_string()).await;
-
-        match stream_info_res {
-            Ok(stream_info) => {
-                println!("Connected to NATS server SINK+JS {:?}", js);
-                println!("- stream info: {:?}", stream_info);
-                println!();
-            },
-            Err(e) => {
-                println!("Stream setup failed on NATS server SINK+JS {:?}", js);
-                println!("- error: {:?}", e);
-                println!();
-                panic!("aborting");
-            },
-        }
+        // NOTE: Right now, we don't care about setting up streams. Let the admin handle that using
+        // nats cli commands. Just the jetstream connection should be sufficient for us to start
+        // publishing. (The admin should create streams for the subjects as appropriate.)
 
         Ok(Sink {
             jsctx: js,
         })
     }
 
+    pub async fn publish<S: async_nats::subject::ToSubject>(
+        &self,
+        subject: S,
+        payload: Bytes
+    ) -> Result<async_nats::jetstream::context::PublishAckFuture, async_nats::jetstream::context::PublishError> {
+        self.jsctx.publish(subject, payload).await
+    }
+
+    /*
     pub async fn publish_unique<S: async_nats::subject::ToSubject>(
         &self,
         subject: S,
@@ -71,4 +56,5 @@ impl Sink {
 
         self.jsctx.publish_with_headers(subject, headers, payload).await
     }
+    */
 }

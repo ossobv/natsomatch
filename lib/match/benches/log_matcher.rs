@@ -8,15 +8,15 @@ fn criterion_benchmark(c: &mut Criterion) {
     c.bench_function("Match::from_attributes(samples::HAPROXY)", |b| {
         let attr = BytesAttributes::from_payload(samples::HAPROXY).unwrap();
         b.iter(|| {
-            let m = Match::from_attributes(black_box(&attr)).unwrap();
-            assert_eq!(m.destination, "bulk_match_haproxy");
+            let _m = Match::from_attributes(black_box(&attr)).unwrap();
+            // assert_eq!(m.subject, "bulk.haproxy.wilee.example-dmz-cat4.lb1-dr-example-com");
         });
     });
     c.bench_function("Match::from_attributes(samples::UNKNOWN)", |b| {
         let attr = BytesAttributes::from_payload(samples::UNKNOWN).unwrap();
         b.iter(|| {
-            let m = Match::from_attributes(black_box(&attr)).unwrap();
-            assert_eq!(m.destination, "bulk_match_unknown");
+            let _m = Match::from_attributes(black_box(&attr)).unwrap();
+            // assert_eq!(m.subject, "bulk.unknown.unknown-tenant.unknown-section.unknown-example-com");
         });
     });
 }

@@ -5,30 +5,14 @@ use toml::Value;
 
 static MISSING_VALUE: &str = "";
 
+#[derive(Clone)]
 #[derive(Debug)]
 pub struct NatsAuth {
     pub username: Option<String>,
     pub password: Option<String>,
 }
 
-#[derive(Debug)]
-pub struct NatsConfig {
-    pub server: String,
-    pub auth: Option<NatsAuth>,
-    pub subject: String,
-    pub tls: Option<TlsConfig>,
-}
-
-#[derive(Debug)]
-pub struct JetStreamConfig {
-    pub server: String,
-    pub auth: Option<NatsAuth>,
-    pub name: String,
-    pub subject_any: String,
-    pub subject_tpl: String,
-    pub tls: Option<TlsConfig>,
-}
-
+#[derive(Clone)]
 #[derive(Debug)]
 pub struct TlsConfig {
     pub server_name: Option<String>,
@@ -37,30 +21,48 @@ pub struct TlsConfig {
     pub key_file: Option<String>,
 }
 
+#[derive(Clone)]
+#[derive(Debug)]
+pub struct NatsConfig {
+    pub server: String,
+    pub auth: Option<NatsAuth>,
+    pub tls: Option<TlsConfig>,
+}
+
+#[derive(Clone)]
+#[derive(Debug)]
+pub struct InputConfig {
+    pub natsconfig: NatsConfig,
+    pub stream: String,
+    pub consumer: String,
+}
+
+#[derive(Debug)]
+pub struct SinkConfig {
+    pub natsconfig: NatsConfig,
+}
+
 #[derive(Debug)]
 pub struct AppConfig {
-    pub input: NatsConfig,      // should be more inputs
-    pub sink: JetStreamConfig,  // should be more sinks
+    pub input: InputConfig,
+    pub sink: SinkConfig,
 }
 
 
-fn parse_input_config(config: &Value) -> NatsConfig {
-    let input_section = &config["input"]["my_nats"];
+fn parse_nats_config(config: &Value, section: &str) -> NatsConfig {
+    let input_section = &config[section];
 
     let server: String;
     let auth: Option<NatsAuth>;
-    let subject: String;
 
     match input_section.get("nats") {
         Some(nats) => {
             server = nats.get("server").and_then(|v| v.as_str()).unwrap_or(MISSING_VALUE).to_string();
             auth = nats.get("auth").map(parse_auth_config);
-            subject = nats.get("subject").and_then(|v| v.as_str()).unwrap_or(MISSING_VALUE).to_string();
         },
         None => {
             server = MISSING_VALUE.into();
             auth = None::<NatsAuth>;
-            subject = MISSING_VALUE.into();
         },
     };
 
@@ -68,50 +70,41 @@ fn parse_input_config(config: &Value) -> NatsConfig {
 
     NatsConfig {
         server,
-        auth,
-        subject,
         tls,
+        auth,
     }
 }
 
-fn parse_sink_config(config: &Value) -> JetStreamConfig {
-    let sink_section = &config["sink"]["my_jetstream"];
+fn parse_input_config(config: &Value) -> InputConfig {
+    let natsconfig = parse_nats_config(&config, "input");
 
-    let server: String;
-    let auth: Option<NatsAuth>;
-    let name: String;
-    let subject_tpl: String;
+    let stream: String;
+    let consumer: String;
 
-    match sink_section.get("jetstream") {
-        Some(jetstream) => {
-            server = jetstream.get("server").and_then(|v| v.as_str()).unwrap_or(MISSING_VALUE).into();
-            auth = jetstream.get("auth").map(parse_auth_config);
-            name = jetstream.get("name").and_then(|v| v.as_str()).unwrap_or(MISSING_VALUE).into();
-            subject_tpl = jetstream.get("subject_tpl").and_then(|v| v.as_str()).unwrap_or(MISSING_VALUE).into();
+    let input_section = &config["input"];
+    match input_section.get("nats") {
+        Some(nats) => {
+            stream = nats.get("stream").and_then(|v| v.as_str()).unwrap_or(MISSING_VALUE).to_string();
+            consumer = nats.get("consumer").and_then(|v| v.as_str()).unwrap_or(MISSING_VALUE).to_string();
         },
         None => {
-            server = MISSING_VALUE.to_string();
-            auth = None::<NatsAuth>;
-            name = MISSING_VALUE.to_string();
-            subject_tpl = MISSING_VALUE.to_string();
+            stream = MISSING_VALUE.into();
+            consumer = MISSING_VALUE.into();
         },
     };
 
-    let tls = sink_section.get("tls").map(parse_tls_config);
-
-    // Copy the "abc.{def}" template and turn into "abc.*"
-    let mut subject_any: String = subject_tpl.clone();
-    if let Some(index) = subject_any.find('{') {
-        subject_any.replace_range(index.., "*");
+    InputConfig {
+        natsconfig,
+        stream,
+        consumer,
     }
+}
 
-    JetStreamConfig {
-        server,
-        auth,
-        name,
-        subject_any,
-        subject_tpl,
-        tls,
+fn parse_sink_config(config: &Value) -> SinkConfig {
+    let natsconfig = parse_nats_config(&config, "sink");
+
+    SinkConfig {
+        natsconfig,
     }
 }
 
@@ -139,7 +132,7 @@ fn parse_tls_config(tls_section: &Value) -> TlsConfig {
     }
 }
 
-pub fn parse_string(config_str: String) -> Result<AppConfig, String> {
+fn parse_string(config_str: String) -> Result<AppConfig, String> {
     // Parse the configuration (TOML trait)
     let config: Value = match config_str.parse() {
         Ok(parsed) => parsed,
@@ -174,25 +167,30 @@ mod tests {
     use super::*;
 
     static SAMPLE_CONF: &str = r#"
-        [input.my_nats]
+        [input]
         # Input source
         nats.server = 'nats://10.20.30.40:4222'
-        nats.subject = 'NS.log.vector-in'
         # Server certificate validation (tls.server_name is not working)
         tls.server_name = 'nats.local'
         tls.ca_file = './nats_ca.crt'
         # Client certificate
         tls.cert_file = './nats_client.crt'
         tls.key_file = './nats_client.key'
+        # Select manually made consumer from stream
+        nats.stream = 'bulk_unfiltered'
+        nats.consumer = 'bulk_unfiltered_consumer'
 
-        [sink.my_jetstream]
+        [sink]
         # Output target
-        jetstream.server = 'nats://nats.example.com:4222'
-        jetstream.auth = { username = 'derek', password = 's3cr3t!' }
-        jetstream.name = 'bulk'
-        jetstream.subject_tpl = 'bulk.section.{section}'
+        nats.server = 'nats://nats.example.com:4222'
+        nats.auth = { username = 'derek', password = 's3cr3t!' }
         # Server certificate validation (tls.server_name is not working)
         tls.ca_file = '/etc/ssl/certs/ca-certificates.crt'
+        # Client certificate
+        #tls.cert_file = './nats_client.crt'
+        #tls.key_file = './nats_client.key'
+        # No need to set jetstream name or subjects. The subject generation is
+        # hardcoded for now, based on the message.
     "#;
 
     #[test]
@@ -200,21 +198,24 @@ mod tests {
         let maybe_conf = parse_string(SAMPLE_CONF.into());
         match maybe_conf {
             Ok(conf) => {
-                let in_tls = conf.input.tls.unwrap();
-                assert_eq!(conf.input.server, "nats://10.20.30.40:4222".to_owned());
-                assert!(conf.input.auth.is_none());
-                assert_eq!(conf.input.subject, "NS.log.vector-in".to_owned());
+                let in_srv = conf.input.natsconfig;
+                let in_auth = in_srv.auth;
+                let in_tls = in_srv.tls.unwrap();
+                assert_eq!(in_srv.server, "nats://10.20.30.40:4222".to_owned());
+                assert!(in_auth.is_none());
                 assert_eq!(in_tls.server_name.unwrap(), "nats.local".to_owned());
                 assert_eq!(in_tls.ca_file.unwrap(), "./nats_ca.crt".to_owned());
                 assert_eq!(in_tls.cert_file.unwrap(), "./nats_client.crt".to_owned());
                 assert_eq!(in_tls.key_file.unwrap(), "./nats_client.key".to_owned());
+                assert_eq!(conf.input.stream, "bulk_unfiltered".to_owned());
+                assert_eq!(conf.input.consumer, "bulk_unfiltered_consumer".to_owned());
 
-                let sn_auth = conf.sink.auth.unwrap();
-                let sn_tls = conf.sink.tls.unwrap();
-                assert_eq!(conf.sink.server, "nats://nats.example.com:4222".to_owned());
+                let sn_srv = conf.sink.natsconfig;
+                let sn_auth = sn_srv.auth.unwrap();
+                let sn_tls = sn_srv.tls.unwrap();
+                assert_eq!(sn_srv.server, "nats://nats.example.com:4222".to_owned());
                 assert_eq!(sn_auth.username.unwrap(), "derek".to_owned());
                 assert_eq!(sn_auth.password.unwrap(), "s3cr3t!".to_owned());
-                assert_eq!(conf.sink.subject_tpl, "bulk.section.{section}".to_owned());
                 assert_eq!(sn_tls.ca_file.unwrap(), "/etc/ssl/certs/ca-certificates.crt".to_owned());
                 assert!(sn_tls.cert_file.is_none());
                 assert!(sn_tls.key_file.is_none());

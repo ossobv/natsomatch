@@ -27,7 +27,7 @@ Output:
 
 .. code-block:: rust
 
-    BytesAttributes{
+    BytesAttributes {
         hostname: b"mgmt.example",
         section: b"section-dmz-cat4",
         timestamp: b"1708101998323659000",

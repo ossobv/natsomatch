@@ -7,7 +7,6 @@ use nats2jetstream_json::payload_parser::BytesAttributes;
 
 #[derive(Debug)]
 pub struct Match {
-    pub destination: &'static str,  // JetStream stream to publish to
     pub subject: String,            // subject to use when publishing
 }
 
@@ -37,30 +36,30 @@ impl Match {
         // One giant if here
         // ==============================================================
 
-        if starts_with(&attrs.systemd_unit, b"haproxy@") {
-            return Ok(Match{
-                destination: "bulk_match_haproxy",
-                subject: format!("haproxy.{tenant}.{section}.{hostname}"),
+        if starts_with(attrs.systemd_unit, b"haproxy@") {
+            return Ok(Match {
+                // destination: "bulk_match_haproxy",
+                subject: format!("bulk.haproxy.{tenant}.{section}.{hostname}"),
             });
         }
 
         if attrs.systemd_unit == b"kube-apiserver.service" {
-            return Ok(Match{
-                destination: "bulk_match_k8s",
-                subject: format!("k8s.{tenant}.{section}.{hostname}"),
+            return Ok(Match {
+                // destination: "bulk_match_k8s",
+                subject: format!("bulk.k8s.{tenant}.{section}.{hostname}"),
             });
         }
 
         if starts_with(attrs.filename, b"/var/log/nginx/") {
-            return Ok(Match{
-                destination: "bulk_match_nginx",
-                subject: format!("nginx.{tenant}.{section}.{hostname}"),
+            return Ok(Match {
+                // destination: "bulk_match_nginx",
+                subject: format!("bulk.nginx.{tenant}.{section}.{hostname}"),
             });
         }
 
-        Ok(Match{
-            destination: "bulk_match_unknown",
-            subject: format!("unknown.{tenant}.{section}.{hostname}"),
+        Ok(Match {
+            // destination: "bulk_match_unknown",
+            subject: format!("bulk.unknown.{tenant}.{section}.{hostname}"),
         })
     }
 }
@@ -158,31 +157,31 @@ mod tests {
     fn test_haproxy() {
         let attrs = BytesAttributes::from_payload(samples::HAPROXY).expect("parse error");
         let match_ = Match::from_attributes(&attrs).expect("match error");
-        assert_eq!(match_.destination, "bulk_match_haproxy");
-        assert_eq!(match_.subject, "haproxy.wilee.example-dmz-cat4.lb1-dr-example-com");
+        // assert_eq!(match_.destination, "bulk_match_haproxy");
+        assert_eq!(match_.subject, "bulk.haproxy.wilee.example-dmz-cat4.lb1-dr-example-com");
     }
 
     #[test]
     fn test_k8s() {
         let attrs = BytesAttributes::from_payload(samples::K8S).expect("parse error");
         let match_ = Match::from_attributes(&attrs).expect("match error");
-        assert_eq!(match_.destination, "bulk_match_k8s");
-        assert_eq!(match_.subject, "k8s.acme.starwars.master-sith-starwars");
+        // assert_eq!(match_.destination, "bulk_match_k8s");
+        assert_eq!(match_.subject, "bulk.k8s.acme.starwars.master-sith-starwars");
     }
 
     #[test]
     fn test_nginx() {
         let attrs = BytesAttributes::from_payload(samples::NGINX).expect("parse error");
         let match_ = Match::from_attributes(&attrs).expect("match error");
-        assert_eq!(match_.destination, "bulk_match_nginx");
-        assert_eq!(match_.subject, "nginx.acme.cust1.lb1-zl-example-com");
+        // assert_eq!(match_.destination, "bulk_match_nginx");
+        assert_eq!(match_.subject, "bulk.nginx.acme.cust1.lb1-zl-example-com");
     }
 
     #[test]
     fn test_unknown() {
         let attrs = BytesAttributes::from_payload(samples::UNKNOWN).expect("parse error");
         let match_ = Match::from_attributes(&attrs).expect("match error");
-        assert_eq!(match_.destination, "bulk_match_unknown");
-        assert_eq!(match_.subject, "unknown.unknown-tenant.unknown-section.unknown-example-com");
+        // assert_eq!(match_.destination, "bulk_match_unknown");
+        assert_eq!(match_.subject, "bulk.unknown.unknown-tenant.unknown-section.unknown-example-com");
     }
 }
