@@ -7,6 +7,12 @@ static MISSING_VALUE: &str = "";
 
 #[derive(Clone)]
 #[derive(Debug)]
+pub struct DevConfig {
+    pub max_messages_per_batch: usize,
+}
+
+#[derive(Clone)]
+#[derive(Debug)]
 pub struct NatsAuth {
     pub username: Option<String>,
     pub password: Option<String>,
@@ -27,6 +33,7 @@ pub struct NatsConfig {
     pub server: String,
     pub auth: Option<NatsAuth>,
     pub tls: Option<TlsConfig>,
+    pub dev: DevConfig,
 }
 
 #[derive(Clone)]
@@ -67,11 +74,13 @@ fn parse_nats_config(config: &Value, section: &str) -> NatsConfig {
     };
 
     let tls = input_section.get("tls").map(parse_tls_config);
+    let dev = parse_dev_config(input_section.get("dev"));
 
     NatsConfig {
         server,
-        tls,
         auth,
+        tls,
+        dev,
     }
 }
 
@@ -115,6 +124,19 @@ fn parse_auth_config(auth_section: &Value) -> NatsAuth {
     NatsAuth {
         username,
         password,
+    }
+}
+
+fn parse_dev_config(dev_section: Option<&Value>) -> DevConfig {
+    let mut max_messages_per_batch: usize = 100;
+
+    if let Some(dev_section) = dev_section {
+        let n: i64 = dev_section.get("max_messages_per_batch").and_then(|v| v.as_integer()).unwrap_or(0);
+        max_messages_per_batch = if 1 <= n && n <= 100_000 { n.try_into().unwrap() } else { 100 };
+    }
+
+    DevConfig {
+        max_messages_per_batch,
     }
 }
 

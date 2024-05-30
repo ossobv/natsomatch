@@ -14,6 +14,16 @@ pub struct Match {
 impl Match {
     pub fn from_attributes(attrs: &BytesAttributes) -> Result<Match, &'static str> {
 
+        // {tenant}  .attributes.tenant <string>
+        // {section} .attributes.section <string>
+        // {timens}  .attributes.time_unix_nano <digits>
+        // {cluster} .attributes.cluster <string> (optional)
+        // {systemd_unit} .attributes.systemd_unit (optional)
+        // {host}    .attributes.host <string>
+        // {message} .message
+        // ({origin} = systemd_unit || filename (<- dots) || '{trans}.{syslog.fac}.{syslog.prio}.{syslog.tag}')
+        //                 ^- without dots, before first @
+
         //    817  zabbix-agent.service
         //    863  suricata.service
         //   1249  /var/log/vault/audit.log

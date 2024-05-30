@@ -30,6 +30,17 @@ persistent *NATS JetStream*.
         --no-headers-only --backoff=none \
         bulk_unfiltered bulk_unfiltered_consumer
 
+* Various subjects may have been configured in lib/src/log_matcher.rs. We'll
+  need to create streams for those::
+
+    for tp in haproxy nginx k8s unknown; do
+        nats stream add --subjects="bulk.$tp.*" --description="Bulk $tp" \
+          --storage=file --replicas=3 --retention=limits --discard=old \
+          --max-bytes=2GiB --max-msgs=-1 --max-msgs-per-subject=-1 \
+          --max-age=-1 --max-msg-size=-1 --dupe-window=60s --no-allow-rollup \
+          --no-deny-delete --no-deny-purge --allow-direct bulk_$tp
+    done
+
 
 ----
 TODO
@@ -37,35 +48,9 @@ TODO
 
 ☐  Rename project from nats2jetstream to nats-o-match.
 
-☐  Hardcode filtering extraction rules (for now?).
+☐  Hardcoded attributes are now in lib/json/src/payload_parser.rs. Maybe make them configurable.
 
-- {tenant}  .attributes.tenant <string>
-- {section} .attributes.section <string>
-- {timens}  .attributes.time_unix_nano <digits>
-- {cluster} .attributes.cluster <string> (optional)
-- {systemd_unit} .attributes.systemd_unit (optional)
-- {host}    .attributes.host <string>
-- {message} .message
-- ({origin} = systemd_unit || filename (<- dots) || '{trans}.{syslog.fac}.{syslog.prio}.{syslog.tag}')
-                  ^- without dots, before first @
-
-☐  Hardcode matching rules (for now?):
-
-- haproxy -> "{origin}"
-
-  {systemd_unit} =^ haproxy@
-
-- nginx:
-
-  {filename} =^ /var/log/nginx/
-
-- devnull:
-
-  - ???
-
-- the_rest:
-
-  - *
+☐  Hardcoded matching rules are now in lib/match/src/log_matcher.rs. Maybe make them configurable.
 
 ☐  Explain setup:
 
@@ -88,16 +73,10 @@ TODO
 ☐  Small stuff:
 
 - Also count average message length.
-- Add a buffer for unique-ids so we can detect and error if were generating dupe unique ids.
 
 ☐  Check and fix behaviour on NATS/subscription disconnect/error.
 
 ☐  Check and fix behaviour on NATS/JetStream disconnect/error.
-
-☐  Consider whether we want to do any parsing so we can do filtering or better subject setting.
-
-- right now we parse the ``"section"`` from the attributes and can place that in the subject ``{section}``.
-
 
 
 -------------------

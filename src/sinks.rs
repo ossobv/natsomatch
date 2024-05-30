@@ -6,6 +6,7 @@ use crate::config_parser;
 use crate::misc_nats;
 
 
+#[derive(Debug)]
 pub struct Sink {
     jsctx: async_nats::jetstream::context::Context,
 }

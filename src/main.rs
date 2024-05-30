@@ -129,20 +129,17 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     // Start the main task
     loop {
-//        let consumer = input.stream.get_consumer(&input.config.stream).await?;
-//
-//        let mut messages = consumer.messages().await?.take(100);
-//
         while let Some(Ok(msg)) = input.next().await {
             // Prepare/parse
             let prep_t0 = Instant::now();
+            let (msg, src_acker) = msg.split(); // split, so we can steal msg.payload
             let attrs = match payload_parser::BytesAttributes::from_payload(&msg.payload) {
                 Ok(ok) => { ok },
-                Err(err) => { eprintln!("payload error: {}; {:?}", err, msg.payload); continue; },
+                Err(err) => { eprintln!("error decoding payload: {}; {:?}", err, msg.payload); continue; },
             };
             let match_ = match log_matcher::Match::from_attributes(&attrs) {
                 Ok(ok) => { ok },
-                Err(err) => { eprintln!("match error: {}; {:?}", err, msg.payload); continue; },
+                Err(err) => { eprintln!("error matching payload: {}; {:?}; {:?}", err, attrs, msg.payload); continue; },
             };
             let prep_td = prep_t0.elapsed();
 
@@ -150,12 +147,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
             // FIXME: publishing should be done in a separate handler so we can continue
             // parsing the others asynchronously? Useful if we'd publish to multiple locations.
             let pub_t0 = Instant::now();
-            match sink.publish(match_.subject, msg.payload.to_owned()).await {
-                Ok(maybe_ack) => {
-                    maybe_ack.await?;           // we got an ACK on publish
-                    msg.ack().await.unwrap();   // we send an ACK to our consumer (FIXME, error handling)
-                },
-                Err(err) => { eprintln!("publish error: {}", err); continue; },
+            let dst_acker = match sink.publish(match_.subject.clone(), msg.payload).await {
+                Ok(maybe_ack) => { maybe_ack },
+                Err(err) => { eprintln!("error on publish(1) of subject {}: {}", match_.subject, err); continue; },
+            };
+            match dst_acker.await { // try acking the dest
+                Ok(_) => { src_acker.ack().await.unwrap(); /* ack the source; FIXME error handling */ },
+                Err(err) => { eprintln!("error on publish(2) of subject {}: {}", match_.subject, err); break; },
             }
             let pub_td = pub_t0.elapsed();
 
@@ -169,9 +167,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
             drop(period_stats);
         }
 
-        // FIXME: Done? Because we processed all? We should sleep and restart.
+        eprintln!("FIXME: When do we get out of the iterator loop?");
         break;
     }
+    eprintln!("nats2jetstream shutting down...");
 
     // XXX: does these work? is this needed?
     healthz_task.abort();
