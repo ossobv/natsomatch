@@ -115,6 +115,23 @@ impl Match {
             });
         }
 
+        if attrs.systemd_unit == b"suricata.service" {
+            return Ok(Match {
+                // destination: "bulk_match_nids",
+                subject: format!("bulk.nids.{tenant}.{section}.{hostname}"),
+            });
+        }
+
+        if attrs.systemd_unit == b"zabbix-agent.service" ||
+                attrs.systemd_unit == b"zabbix-proxy.service" ||
+                attrs.systemd_unit == b"zabbix-server.service" ||
+                attrs.systemd_unit == b"gocollect.service" {
+            return Ok(Match {
+                // destination: "bulk_match_monitoring",
+                subject: format!("bulk.monitoring.{tenant}.{section}.{hostname}"),
+            });
+        }
+
         if attrs.has_no_origin() {
             // TODO: Do we want to decode .message here? Or just do
             // substring matching like this:
