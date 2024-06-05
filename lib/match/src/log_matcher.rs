@@ -62,7 +62,9 @@ impl Match {
 
         if memmem(attrs.message, br#"\"_TRANSPORT\":\"syslog\""#).is_some() {
             if memmem(attrs.message, br#"\"_AUDIT_SESSION\":\""#).is_some() ||
-                    memmem(attrs.message, br#"\"MESSAGE\":\"pam_unix("#).is_some() {
+                    memmem(attrs.message, br#"\"MESSAGE\":\"pam_unix("#).is_some() ||
+                    (attrs.systemd_unit == b"zabbix-agent.service" &&
+                     memmem(attrs.message, br#"\"SYSLOG_FACILITY\":\"10\""#).is_some()) {
                 return Ok(Match {
                     // destination: "bulk_match_audit",
                     subject: format!("bulk.audit.{tenant}.{section}.{hostname}"),
@@ -83,6 +85,20 @@ impl Match {
             return Ok(Match {
                 // destination: "bulk_match_execve",
                 subject: format!("bulk.execve.{tenant}.{section}.{hostname}"),
+            });
+        }
+
+        if attrs.filename == b"/var/log/vault/audit.log" {
+            return Ok(Match {
+                // destination: "bulk_match_vault",
+                subject: format!("bulk.vault.{tenant}.{section}.{hostname}"),
+            });
+        }
+
+        if attrs.filename == b"/var/log/kubernetes/audit/audit.log" {
+            return Ok(Match {
+                // destination: "bulk_match_k8s-audit",
+                subject: format!("bulk.k8s-audit.{tenant}.{section}.{hostname}"),
             });
         }
 
