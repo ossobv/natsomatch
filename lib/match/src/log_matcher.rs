@@ -77,7 +77,15 @@ impl Match {
         if attrs.has_no_origin() {
             // TODO: Do we want to decode .message here? Or just do
             // substring matching like this:
-            if memmem(attrs.message, br#",\"SYSLOG_IDENTIFIER\":\"osso-change\","#).is_some() {
+
+            if memmem(attrs.message, br#"\"_TRANSPORT\":\"audit\""#).is_some() {
+                return Ok(Match {
+                    // destination: "bulk_match_audit",
+                    subject: format!("bulk.audit.{tenant}.{section}.{hostname}"),
+                });
+            }
+
+            if memmem(attrs.message, br#"\"SYSLOG_IDENTIFIER\":\"osso-change\""#).is_some() {
                 return Ok(Match {
                     // destination: "bulk_match_execve",
                     subject: format!("bulk.execve.{tenant}.{section}.{hostname}"),
@@ -154,6 +162,18 @@ pub mod samples {
     ,"observed_timestamp":"2024-05-28T16:58:50.887807787Z"
     ,"source_type":"opentelemetry"
     ,"timestamp":"2024-05-28T16:58:50.505521Z"}"#;
+
+    pub static KERNEL_AUDIT: &[u8] = br#"
+    {"attributes":{"cluster":"k8s-acme-prod-backend1","host":"node1.acme.tld"
+    ,"job":"loki.source.journal.logs_journald_generic"
+    ,"loki.attribute.labels":"job"
+    ,"observed_time_unix_nano":1717588833648370149,"section":"acme"
+    ,"tenant":"acme-ops","time_unix_nano":1717588833264832000}
+    ,"dropped_attributes_count":0
+    ,"message":"{\"AUDIT_FIELD_ACCT\":\"zabbix\",\"AUDIT_FIELD_ADDR\":\"?\",\"AUDIT_FIELD_EXE\":\"/usr/bin/sudo\",\"AUDIT_FIELD_GRANTORS\":\"pam_permit\",\"AUDIT_FIELD_HOSTNAME\":\"?\",\"AUDIT_FIELD_OP\":\"PAM:accounting\",\"AUDIT_FIELD_RES\":\"success\",\"AUDIT_FIELD_TERMINAL\":\"?\",\"MESSAGE\":\"USER_ACCT pid=1417310 uid=110 auid=4294967295 ses=4294967295 subj=unconfined msg='op=PAM:accounting grantors=pam_permit acct=\\\"zabbix\\\" exe=\\\"/usr/bin/sudo\\\" hostname=? addr=? terminal=? res=success'\",\"SYSLOG_FACILITY\":\"4\",\"SYSLOG_IDENTIFIER\":\"audit\",\"_AUDIT_ID\":\"13817439\",\"_AUDIT_LOGINUID\":\"4294967295\",\"_AUDIT_SESSION\":\"4294967295\",\"_AUDIT_TYPE\":\"1101\",\"_AUDIT_TYPE_NAME\":\"USER_ACCT\",\"_BOOT_ID\":\"284\",\"_HOSTNAME\":\"node1.acme.tld\",\"_MACHINE_ID\":\"ca7\",\"_PID\":\"1417310\",\"_SELINUX_CONTEXT\":\"unconfined\",\"_SOURCE_REALTIME_TIMESTAMP\":\"1717588833260000\",\"_TRANSPORT\":\"audit\",\"_UID\":\"110\"}"
+    ,"observed_timestamp":"2024-06-05T12:00:33.648370149Z"
+    ,"source_type":"opentelemetry"
+    ,"timestamp":"2024-06-05T12:00:33.264832Z"}"#;
 
     pub static NGINX: &[u8] = br#"
     {"attributes":{"filename":"/var/log/nginx/cust1/prd-access.log",
