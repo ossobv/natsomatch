@@ -85,7 +85,7 @@ fn parse_nats_config(config: &Value, section: &str) -> NatsConfig {
 }
 
 fn parse_input_config(config: &Value) -> InputConfig {
-    let natsconfig = parse_nats_config(&config, "input");
+    let natsconfig = parse_nats_config(config, "input");
 
     let stream: String;
     let consumer: String;
@@ -110,7 +110,7 @@ fn parse_input_config(config: &Value) -> InputConfig {
 }
 
 fn parse_sink_config(config: &Value) -> SinkConfig {
-    let natsconfig = parse_nats_config(&config, "sink");
+    let natsconfig = parse_nats_config(config, "sink");
 
     SinkConfig {
         natsconfig,

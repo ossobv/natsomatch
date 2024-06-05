@@ -48,7 +48,7 @@ impl Input {
             _config: input.clone(),
             _stream: stream,
             _consumer: consumer,
-            messages: messages,
+            messages,
         })
     }
 
