@@ -70,7 +70,9 @@ impl Match {
             }
         }
 
-        if attrs.systemd_unit == b"kube-apiserver.service" {
+        if attrs.systemd_unit == b"kube-apiserver.service"  ||
+                attrs.systemd_unit == b"kube-controller-manager.service" ||
+                attrs.systemd_unit == b"kubelet.service" {
             return Ok(Match {
                 // destination: "bulk_match_k8s",
                 subject: format!("bulk.k8s.{tenant}.{section}.{hostname}"),
@@ -81,6 +83,19 @@ impl Match {
             return Ok(Match {
                 // destination: "bulk_match_execve",
                 subject: format!("bulk.execve.{tenant}.{section}.{hostname}"),
+            });
+        }
+
+        if (starts_with(attrs.systemd_unit, b"systemd-") &&
+                ends_with(attrs.systemd_unit, b".service")) ||
+                (starts_with(attrs.systemd_unit, b"session-") &&
+                 ends_with(attrs.systemd_unit, b".scope")) ||
+                (starts_with(attrs.systemd_unit, b"user@") &&
+                 ends_with(attrs.systemd_unit, b".service")) ||
+                attrs.systemd_unit == b"init.scope" {
+            return Ok(Match {
+                // destination: "bulk_match_systemd",
+                subject: format!("bulk.systemd.{tenant}.{section}.{hostname}"),
             });
         }
 
@@ -147,6 +162,14 @@ fn replace_dots_with_dashes(input: &[u8]) -> String {
 ///
 fn starts_with(bytes: &[u8], prefix: &[u8]) -> bool {
     bytes.len() >= prefix.len() && &bytes[0..prefix.len()] == prefix
+}
+
+
+///
+/// Check whether bytes ends with suffix.
+///
+fn ends_with(bytes: &[u8], suffix: &[u8]) -> bool {
+    bytes.len() >= suffix.len() && &bytes[bytes.len()-suffix.len()..] == suffix
 }
 
 
@@ -302,28 +325,44 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_haproxy() {
+    fn test_starts_with() {
+        assert!(starts_with(b"abcdef", b"abc"));
+        assert!(starts_with(b"abc", b"abc"));
+        assert!(!starts_with(b"ab", b"abc"));
+        assert!(!starts_with(b"abdef", b"abc"));
+    }
+
+    #[test]
+    fn test_ends_with() {
+        assert!(ends_with(b"abcdef", b"def"));
+        assert!(ends_with(b"def", b"def"));
+        assert!(!ends_with(b"ef", b"def"));
+        assert!(!ends_with(b"abcef", b"def"));
+    }
+
+    #[test]
+    fn test_match_haproxy() {
         let attrs = BytesAttributes::from_payload(samples::HAPROXY).expect("parse error");
         let match_ = Match::from_attributes(&attrs).expect("match error");
         assert_eq!(match_.subject, "bulk.haproxy.wilee.example-dmz-cat4.lb1-dr-example-com");
     }
 
     #[test]
-    fn test_k8s() {
+    fn test_match_k8s() {
         let attrs = BytesAttributes::from_payload(samples::K8S).expect("parse error");
         let match_ = Match::from_attributes(&attrs).expect("match error");
         assert_eq!(match_.subject, "bulk.k8s.acme.starwars.master-sith-starwars");
     }
 
     #[test]
-    fn test_kernel_audit() {
+    fn test_match_kernel_audit() {
         let attrs = BytesAttributes::from_payload(samples::KERNEL_AUDIT).expect("parse error");
         let match_ = Match::from_attributes(&attrs).expect("match error");
         assert_eq!(match_.subject, "bulk.audit.acme-ops.acme.node1-acme-tld");
     }
 
     #[test]
-    fn test_kernel_iptables() {
+    fn test_match_kernel_iptables() {
         let attrs = BytesAttributes::from_payload(samples::KERNEL_IPTABLES).expect("parse error");
         let match_ = Match::from_attributes(&attrs).expect("match error");
         assert_eq!(match_.subject, "bulk.firewall.tenant2.section2.example-com");
@@ -334,21 +373,21 @@ mod tests {
     }
 
     #[test]
-    fn test_nginx() {
+    fn test_match_nginx() {
         let attrs = BytesAttributes::from_payload(samples::NGINX).expect("parse error");
         let match_ = Match::from_attributes(&attrs).expect("match error");
         assert_eq!(match_.subject, "bulk.nginx.acme.cust1.lb1-zl-example-com");
     }
 
     #[test]
-    fn test_osso_change() {
+    fn test_match_osso_change() {
         let attrs = BytesAttributes::from_payload(samples::OSSO_CHANGE).expect("parse error");
         let match_ = Match::from_attributes(&attrs).expect("match error");
         assert_eq!(match_.subject, "bulk.execve.important.secret.some-server");
     }
 
     #[test]
-    fn test_syslog_audit() {
+    fn test_match_syslog_audit() {
         let attrs = BytesAttributes::from_payload(samples::SYSLOG_AUDIT).expect("parse error");
         let match_ = Match::from_attributes(&attrs).expect("match error");
         assert_eq!(match_.subject, "bulk.audit.T.S.lb-example-com");
@@ -359,14 +398,14 @@ mod tests {
     }
 
     #[test]
-    fn test_tetragon_audit() {
+    fn test_match_tetragon_audit() {
         let attrs = BytesAttributes::from_payload(samples::TETRAGON_AUDIT).expect("parse error");
         let match_ = Match::from_attributes(&attrs).expect("match error");
         assert_eq!(match_.subject, "bulk.execve.acme.backup.abc-backup-cloud");
     }
 
     #[test]
-    fn test_unknown() {
+    fn test_match_unknown() {
         let attrs = BytesAttributes::from_payload(samples::UNKNOWN).expect("parse error");
         let match_ = Match::from_attributes(&attrs).expect("match error");
         assert_eq!(match_.subject, "bulk.unknown.unknown-tenant.unknown-section.unknown-example-com");
