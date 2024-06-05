@@ -78,8 +78,10 @@ impl Match {
             // TODO: Do we want to decode .message here? Or just do
             // substring matching like this:
 
-            if memmem(attrs.message, br#"\"_TRANSPORT\":\"kernel\""#).is_some() {
-                if memmem(attrs.message, br#"\"MESSAGE\":\"IN="#).is_some() {
+            if memmem(attrs.message, br#"\"_TRANSPORT\":\"kernel\""#).is_some() &&
+                        memmem(attrs.message, br#"\"MESSAGE\":\"#).is_some() {
+                if memmem(attrs.message, br#"IN="#).is_some() &&
+                        memmem(attrs.message, br#" OUT="#).is_some() {
                     return Ok(Match {
                         // destination: "bulk_match_audit",
                         subject: format!("bulk.firewall.{tenant}.{section}.{hostname}"),
@@ -196,6 +198,17 @@ pub mod samples {
     ,"source_type":"opentelemetry"
     ,"timestamp":"2024-06-05T12:00:58.128394Z"}"#;
 
+    pub static KERNEL_IPTABLES2: &[u8] = br#"
+    {"attributes":{"host":"lb.example.com"
+    ,"job":"loki.source.journal.logs_journald_generic"
+    ,"loki.attribute.labels":"job"
+    ,"observed_time_unix_nano":1717594098353743180,"section":"S","tenant":"T"
+    ,"time_unix_nano":1717594098186173000},"dropped_attributes_count":0
+    ,"message":"{\"MESSAGE\":\"OUTPUT:DROP: IN= OUT=enp2s0.123 SRC=10.123.1.1 DST=10.123.1.2 LEN=60 TOS=0x00 PREC=0x00 TTL=64 ID=61632 DF PROTO=TCP SPT=23948 DPT=30080 WINDOW=64240 RES=0x00 SYN URGP=0 \",\"PRIORITY\":\"6\",\"SYSLOG_FACILITY\":\"0\",\"SYSLOG_IDENTIFIER\":\"kernel\",\"_BOOT_ID\":\"27e\",\"_HOSTNAME\":\"lb.example.com\",\"_MACHINE_ID\":\"9e2\",\"_SOURCE_MONOTONIC_TIMESTAMP\":\"41035084405569\",\"_TRANSPORT\":\"kernel\"}"
+    ,"observed_timestamp":"2024-06-05T13:28:18.353743180Z"
+    ,"source_type":"opentelemetry"
+    ,"timestamp":"2024-06-05T13:28:18.186173Z"}"#;
+
     pub static NGINX: &[u8] = br#"
     {"attributes":{"filename":"/var/log/nginx/cust1/prd-access.log",
     "host":"lb1.zl.example.com","log.file.name":"prd-access.log"
@@ -280,6 +293,10 @@ mod tests {
         let attrs = BytesAttributes::from_payload(samples::KERNEL_IPTABLES).expect("parse error");
         let match_ = Match::from_attributes(&attrs).expect("match error");
         assert_eq!(match_.subject, "bulk.firewall.tenant2.section2.example-com");
+
+        let attrs = BytesAttributes::from_payload(samples::KERNEL_IPTABLES2).expect("parse error");
+        let match_ = Match::from_attributes(&attrs).expect("match error");
+        assert_eq!(match_.subject, "bulk.firewall.T.S.lb-example-com");
     }
 
     #[test]
