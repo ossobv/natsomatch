@@ -269,6 +269,13 @@ mod tests {
     }
 
     #[test]
+    fn test_kernel_audit() {
+        let attrs = BytesAttributes::from_payload(samples::KERNEL_AUDIT).expect("parse error");
+        let match_ = Match::from_attributes(&attrs).expect("match error");
+        assert_eq!(match_.subject, "bulk.audit.acme-ops.acme.node1-acme-tld");
+    }
+
+    #[test]
     fn test_kernel_iptables() {
         let attrs = BytesAttributes::from_payload(samples::KERNEL_IPTABLES).expect("parse error");
         let match_ = Match::from_attributes(&attrs).expect("match error");
