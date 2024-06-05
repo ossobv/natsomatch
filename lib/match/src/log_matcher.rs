@@ -53,17 +53,27 @@ impl Match {
             });
         }
 
-        if attrs.systemd_unit == b"kube-apiserver.service" {
-            return Ok(Match {
-                // destination: "bulk_match_k8s",
-                subject: format!("bulk.k8s.{tenant}.{section}.{hostname}"),
-            });
-        }
-
         if starts_with(attrs.filename, b"/var/log/nginx/") {
             return Ok(Match {
                 // destination: "bulk_match_nginx",
                 subject: format!("bulk.nginx.{tenant}.{section}.{hostname}"),
+            });
+        }
+
+        if memmem(attrs.message, br#"\"_TRANSPORT\":\"syslog\""#).is_some() {
+            if memmem(attrs.message, br#"\"_AUDIT_SESSION\":\""#).is_some() ||
+                    memmem(attrs.message, br#"\"MESSAGE\":\"pam_unix("#).is_some() {
+                return Ok(Match {
+                    // destination: "bulk_match_audit",
+                    subject: format!("bulk.audit.{tenant}.{section}.{hostname}"),
+                });
+            }
+        }
+
+        if attrs.systemd_unit == b"kube-apiserver.service" {
+            return Ok(Match {
+                // destination: "bulk_match_k8s",
+                subject: format!("bulk.k8s.{tenant}.{section}.{hostname}"),
             });
         }
 
@@ -235,6 +245,30 @@ pub mod samples {
     ,"source_type":"opentelemetry"
     ,"timestamp":"2024-05-30T14:50:24.000032Z"}"#;
 
+    pub static SYSLOG_AUDIT: &[u8] = br#"
+    {"attributes":{"host":"lb.example.com"
+    ,"job":"loki.source.journal.logs_journald_generic"
+    ,"loki.attribute.labels":"systemd_unit,job"
+    ,"observed_time_unix_nano":1717588861410850513
+    ,"section":"S","systemd_unit":"cron.service","tenant":"T"
+    ,"time_unix_nano":1717588861193959000},"dropped_attributes_count":0
+    ,"message":"{\"MESSAGE\":\"pam_unix(cron:session): session opened for user root by (uid=0)\",\"PRIORITY\":\"6\",\"SYSLOG_FACILITY\":\"10\",\"SYSLOG_IDENTIFIER\":\"CRON\",\"SYSLOG_PID\":\"3825520\",\"SYSLOG_TIMESTAMP\":\"Jun  5 14:01:01 \",\"_AUDIT_LOGINUID\":\"0\",\"_AUDIT_SESSION\":\"5133381\",\"_BOOT_ID\":\"f9b\",\"_CAP_EFFECTIVE\":\"3fffffffff\",\"_CMDLINE\":\"/usr/sbin/CRON -f\",\"_COMM\":\"cron\",\"_EXE\":\"/usr/sbin/cron\",\"_GID\":\"0\",\"_HOSTNAME\":\"lb.example.com\",\"_MACHINE_ID\":\"9da\",\"_PID\":\"3825520\",\"_SELINUX_CONTEXT\":\"unconfined\\n\",\"_SOURCE_REALTIME_TIMESTAMP\":\"1717588861193047\",\"_SYSTEMD_CGROUP\":\"/system.slice/cron.service\",\"_SYSTEMD_INVOCATION_ID\":\"f20\",\"_SYSTEMD_SLICE\":\"system.slice\",\"_SYSTEMD_UNIT\":\"cron.service\",\"_TRANSPORT\":\"syslog\",\"_UID\":\"0\"}"
+    ,"observed_timestamp":"2024-06-05T12:01:01.410850513Z"
+    ,"source_type":"opentelemetry"
+    ,"timestamp":"2024-06-05T12:01:01.193959Z"}"#;
+
+    pub static SYSLOG_AUDIT2: &[u8] = br#"
+    {"attributes":{"host":"lb.example.com"
+    ,"job":"loki.source.journal.logs_journald_generic"
+    ,"loki.attribute.labels":"systemd_unit,job"
+    ,"observed_time_unix_nano":1717594440522496966,"section":"S"
+    ,"systemd_unit":"zabbix-agent.service","tenant":"T"
+    ,"time_unix_nano":1717594440187604000},"dropped_attributes_count":0
+    ,"message":"{\"MESSAGE\":\"pam_unix(sudo:session): session closed for user root\",\"PRIORITY\":\"6\",\"SYSLOG_FACILITY\":\"10\",\"SYSLOG_IDENTIFIER\":\"sudo\",\"SYSLOG_TIMESTAMP\":\"Jun  5 15:34:00 \",\"_BOOT_ID\":\"f9b\",\"_CAP_EFFECTIVE\":\"3fffffffff\",\"_CMDLINE\":\"sudo iptables -S FORWARD -w\",\"_COMM\":\"sudo\",\"_EXE\":\"/usr/bin/sudo\",\"_GID\":\"0\",\"_HOSTNAME\":\"lb.example.com\",\"_MACHINE_ID\":\"9da\",\"_PID\":\"3871095\",\"_SELINUX_CONTEXT\":\"unconfined\\n\",\"_SOURCE_REALTIME_TIMESTAMP\":\"1717594440187575\",\"_SYSTEMD_CGROUP\":\"/system.slice/zabbix-agent.service\",\"_SYSTEMD_INVOCATION_ID\":\"299\",\"_SYSTEMD_SLICE\":\"system.slice\",\"_SYSTEMD_UNIT\":\"zabbix-agent.service\",\"_TRANSPORT\":\"syslog\",\"_UID\":\"0\"}"
+    ,"observed_timestamp":"2024-06-05T13:34:00.522496966Z"
+    ,"source_type":"opentelemetry"
+    ,"timestamp":"2024-06-05T13:34:00.187604Z"}"#;
+
     pub static TETRAGON_AUDIT: &[u8] = br#"
     {"attributes":{"cluster":"backup.cloud","host":"abc.backup.cloud"
     ,"job":"loki.source.journal.logs_journald_generic"
@@ -311,6 +345,17 @@ mod tests {
         let attrs = BytesAttributes::from_payload(samples::OSSO_CHANGE).expect("parse error");
         let match_ = Match::from_attributes(&attrs).expect("match error");
         assert_eq!(match_.subject, "bulk.execve.important.secret.some-server");
+    }
+
+    #[test]
+    fn test_syslog_audit() {
+        let attrs = BytesAttributes::from_payload(samples::SYSLOG_AUDIT).expect("parse error");
+        let match_ = Match::from_attributes(&attrs).expect("match error");
+        assert_eq!(match_.subject, "bulk.audit.T.S.lb-example-com");
+
+        let attrs = BytesAttributes::from_payload(samples::SYSLOG_AUDIT2).expect("parse error");
+        let match_ = Match::from_attributes(&attrs).expect("match error");
+        assert_eq!(match_.subject, "bulk.audit.T.S.lb-example-com");
     }
 
     #[test]
