@@ -12,8 +12,8 @@ version = "0.1.3"
 [profile.release]
 strip = true        # Automatically strip symbols from the binary
 #opt-level = "z"    # Optimize for size?
-lto = true	    # Enable Link Time Optimization (LTO)
-codegen-units = 1   # Serial build. Slow, but better opt
+#DISABLED_FOR_FASTER_BUILD#lto = true    # Enable Link Time Optimization (LTO)
+#DISABLED_FOR_FASTER_BUILD#codegen-units = 1   # Serial build. Slow, but better opt
 panic = "abort"    # No debug stacktrace awesomeness?
 
 [features]
