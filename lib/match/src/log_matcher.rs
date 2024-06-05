@@ -78,6 +78,15 @@ impl Match {
             // TODO: Do we want to decode .message here? Or just do
             // substring matching like this:
 
+            if memmem(attrs.message, br#"\"_TRANSPORT\":\"kernel\""#).is_some() {
+                if memmem(attrs.message, br#"\"MESSAGE\":\"IN="#).is_some() {
+                    return Ok(Match {
+                        // destination: "bulk_match_audit",
+                        subject: format!("bulk.firewall.{tenant}.{section}.{hostname}"),
+                    });
+                }
+            }
+
             if memmem(attrs.message, br#"\"_TRANSPORT\":\"audit\""#).is_some() {
                 return Ok(Match {
                     // destination: "bulk_match_audit",
@@ -175,6 +184,18 @@ pub mod samples {
     ,"source_type":"opentelemetry"
     ,"timestamp":"2024-06-05T12:00:33.264832Z"}"#;
 
+    pub static KERNEL_IPTABLES: &[u8] = br#"
+    {"attributes":{"cluster":"k8s","host":"example.com"
+    ,"job":"loki.source.journal.logs_journald_generic"
+    ,"loki.attribute.labels":"job"
+    ,"observed_time_unix_nano":1717588858433717607,"section":"section2"
+    ,"tenant":"tenant2","time_unix_nano":1717588858128394000}
+    ,"dropped_attributes_count":0
+    ,"message":"{\"MESSAGE\":\"IN= OUT=ens19 SRC=10.1.2.3 DST=10.1.2.4 LEN=177 TOS=0x00 PREC=0x00 TTL=64 ID=35588 PROTO=UDP SPT=49988 DPT=8472 LEN=157 MARK=0xc00 \",\"PRIORITY\":\"4\",\"SYSLOG_FACILITY\":\"0\",\"SYSLOG_IDENTIFIER\":\"kernel\",\"_BOOT_ID\":\"fcb\",\"_HOSTNAME\":\"example.com\",\"_MACHINE_ID\":\"356\",\"_SOURCE_MONOTONIC_TIMESTAMP\":\"8646102285350\",\"_TRANSPORT\":\"kernel\"}"
+    ,"observed_timestamp":"2024-06-05T12:00:58.433717607Z"
+    ,"source_type":"opentelemetry"
+    ,"timestamp":"2024-06-05T12:00:58.128394Z"}"#;
+
     pub static NGINX: &[u8] = br#"
     {"attributes":{"filename":"/var/log/nginx/cust1/prd-access.log",
     "host":"lb1.zl.example.com","log.file.name":"prd-access.log"
@@ -245,6 +266,13 @@ mod tests {
         let attrs = BytesAttributes::from_payload(samples::K8S).expect("parse error");
         let match_ = Match::from_attributes(&attrs).expect("match error");
         assert_eq!(match_.subject, "bulk.k8s.acme.starwars.master-sith-starwars");
+    }
+
+    #[test]
+    fn test_kernel_iptables() {
+        let attrs = BytesAttributes::from_payload(samples::KERNEL_IPTABLES).expect("parse error");
+        let match_ = Match::from_attributes(&attrs).expect("match error");
+        assert_eq!(match_.subject, "bulk.firewall.tenant2.section2.example-com");
     }
 
     #[test]
