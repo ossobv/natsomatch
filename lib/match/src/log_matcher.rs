@@ -65,7 +65,8 @@ impl Match {
             if memmem(attrs.message, br#"\"_AUDIT_SESSION\":\""#).is_some() ||
                     memmem(attrs.message, br#"\"MESSAGE\":\"pam_unix("#).is_some() ||
                     (attrs.systemd_unit == b"zabbix-agent.service" &&
-                     memmem(attrs.message, br#"\"SYSLOG_FACILITY\":\"10\""#).is_some()) {
+                     memmem(attrs.message, br#"\"SYSLOG_FACILITY\":\"10\""#).is_some()) ||
+                    attrs.systemd_unit == b"auditd.service" {
                 return Ok(Match {
                     // destination: "bulk_match_audit",
                     subject: format!("bulk.audit.{tenant}.{section}.{hostname}"),
@@ -75,6 +76,7 @@ impl Match {
 
         if attrs.systemd_unit == b"kube-apiserver.service"  ||
                 attrs.systemd_unit == b"kube-controller-manager.service" ||
+                attrs.systemd_unit == b"kube-scheduler.service" ||
                 attrs.systemd_unit == b"kubelet.service" {
             return Ok(Match {
                 // destination: "bulk_match_k8s",
@@ -117,10 +119,28 @@ impl Match {
             });
         }
 
+        if attrs.systemd_unit == b"etcd.service" {
+            return Ok(Match {
+                // destination: "bulk_match_etcd",
+                subject: format!("bulk.etcd.{tenant}.{section}.{hostname}"),
+            });
+        }
+
         if attrs.systemd_unit == b"suricata.service" {
             return Ok(Match {
                 // destination: "bulk_match_nids",
                 subject: format!("bulk.nids.{tenant}.{section}.{hostname}"),
+            });
+        }
+
+        if attrs.systemd_unit == b"containerd.service" ||
+                attrs.systemd_unit == b"ctre.service" ||
+                attrs.systemd_unit == b"docker.service" ||
+                (starts_with(attrs.systemd_unit, b"docker@") &&
+                 ends_with(attrs.systemd_unit, b".service")) {
+            return Ok(Match {
+                // destination: "bulk_match_v12n",
+                subject: format!("bulk.v12n.{tenant}.{section}.{hostname}"),
             });
         }
 
@@ -131,6 +151,15 @@ impl Match {
             return Ok(Match {
                 // destination: "bulk_match_monitoring",
                 subject: format!("bulk.monitoring.{tenant}.{section}.{hostname}"),
+            });
+        }
+
+        if attrs.systemd_unit == b"tetragon.service" ||
+                (starts_with(attrs.systemd_unit, b"clamav-") &&
+                 ends_with(attrs.systemd_unit, b".service")) {
+            return Ok(Match {
+                // destination: "bulk_match_hids",
+                subject: format!("bulk.hids.{tenant}.{section}.{hostname}"),
             });
         }
 
@@ -222,6 +251,30 @@ fn memmem(haystack: &[u8], needle: &[u8]) -> Option<usize> {
 
 #[cfg(any(test, feature = "benchmark"))]
 pub mod samples {
+    pub static AUDITD: &[u8] = br#"
+    {"attributes":{"cluster":"C","host":"H"
+    ,"job":"loki.source.journal.logs_journald_generic"
+    ,"loki.attribute.labels":"job,systemd_unit"
+    ,"observed_time_unix_nano":1717602602596264580,"section":"S"
+    ,"systemd_unit":"auditd.service","tenant":"T"
+    ,"time_unix_nano":1717602602570258000},"dropped_attributes_count":0
+    ,"message":"{\"MESSAGE\":\"Audit daemon rotating log files\",\"PRIORITY\":\"5\",\"SYSLOG_FACILITY\":\"3\",\"SYSLOG_IDENTIFIER\":\"auditd\",\"SYSLOG_PID\":\"298087\",\"SYSLOG_TIMESTAMP\":\"Jun  5 17:50:02 \",\"_BOOT_ID\":\"adc\",\"_CAP_EFFECTIVE\":\"1fffffeffff\",\"_CMDLINE\":\"/sbin/auditd\",\"_COMM\":\"auditd\",\"_EXE\":\"/usr/sbin/auditd\",\"_GID\":\"0\",\"_HOSTNAME\":\"H\",\"_MACHINE_ID\":\"9df\",\"_PID\":\"298087\",\"_SELINUX_CONTEXT\":\"unconfined\\n\",\"_SOURCE_REALTIME_TIMESTAMP\":\"1717602602570069\",\"_SYSTEMD_CGROUP\":\"/system.slice/auditd.service\",\"_SYSTEMD_INVOCATION_ID\":\"598\",\"_SYSTEMD_SLICE\":\"system.slice\",\"_SYSTEMD_UNIT\":\"auditd.service\",\"_TRANSPORT\":\"syslog\",\"_UID\":\"0\"}"'
+    ,"observed_timestamp":"2024-06-05T15:50:02.596264580Z"
+    ,"source_type":"opentelemetry","timestamp":"2024-06-05T15:50:02.570258Z"}
+    "#;
+
+    pub static ETCD: &[u8] = br#"
+    {"attributes":{"cluster":"C","host":"H"
+    ,"job":"loki.source.journal.logs_journald_generic"
+    ,"loki.attribute.labels":"systemd_unit,job"
+    ,"observed_time_unix_nano":1717621593140205531,"section":"S"
+    ,"systemd_unit":"etcd.service","tenant":"T"
+    ,"time_unix_nano":1717621592861591000},"dropped_attributes_count":0
+    ,"message":"{\"MESSAGE\":\"{\\\"level\\\":\\\"info\\\",\\\"ts\\\":\\\"2024-06-05T23:06:32.861431+0200\\\",\\\"caller\\\":\\\"mvcc/kvstore_compaction.go:66\\\",\\\"msg\\\":\\\"finished scheduled compaction\\\",\\\"compact-revision\\\":647109883,\\\"took\\\":\\\"184.636903ms\\\",\\\"hash\\\":3144936833}\",\"PRIORITY\":\"6\",\"SYSLOG_FACILITY\":\"3\",\"SYSLOG_IDENTIFIER\":\"etcd\",\"_BOOT_ID\":\"b0b\",\"_CAP_EFFECTIVE\":\"0\",\"_CMDLINE\":\"/usr/bin/etcd\",\"_COMM\":\"etcd\",\"_EXE\":\"/usr/bin/etcd\",\"_GID\":\"65534\",\"_HOSTNAME\":\"H\",\"_MACHINE_ID\":\"bf0\",\"_PID\":\"347\",\"_SELINUX_CONTEXT\":\"unconfined\\n\",\"_STREAM_ID\":\"e38\",\"_SYSTEMD_CGROUP\":\"/system.slice/etcd.service\",\"_SYSTEMD_INVOCATION_ID\":\"b3a\",\"_SYSTEMD_SLICE\":\"system.slice\",\"_SYSTEMD_UNIT\":\"etcd.service\",\"_TRANSPORT\":\"stdout\",\"_UID\":\"111\"}"
+    ,"observed_timestamp":"2024-06-05T21:06:33.140205531Z"
+    ,"source_type":"opentelemetry","timestamp":"2024-06-05T21:06:32.861591Z"}
+    "#;
+
     pub static HAPROXY: &[u8] = br#"
     {"attributes":{"host":"lb1.dr.example.com"
     ,"job":"loki.source.journal.logs_journald_generic"
@@ -231,8 +284,8 @@ pub mod samples {
     ,"time_unix_nano":1716915534575273000},"dropped_attributes_count":0
     ,"message":"{\"MESSAGE\":\"TCP 1.2.3.4:37164 -\\u003e 1.2.3.4:3100(loki-haproxy-tcp-3100-in) -\\u003e 10.1.2.3:443(loki-haproxy-tcp-3100-in) i=3943/o=3477/r=0 tw=1/tc=0/t=43 state=CD conns=1155/1154/1155/1154\",\"PRIORITY\":\"6\",\"SYSLOG_FACILITY\":\"16\",\"SYSLOG_IDENTIFIER\":\"haproxy\",\"SYSLOG_PID\":\"4151570\",\"SYSLOG_RAW\":\"\\u003c134\\u003eMay 28 18:58:54 haproxy[4151570]: TCP 1.2.3.4:37164 -\\u003e 1.2.3.4:3100(loki-haproxy-tcp-3100-in) -\\u003e 10.1.2.3:443(loki-haproxy-tcp-3100-in) i=3943/o=3477/r=0 tw=1/tc=0/t=43 state=CD conns=1155/1154/1155/1154\\n\",\"SYSLOG_TIMESTAMP\":\"May 28 18:58:54 \",\"_BOOT_ID\":\"a41\",\"_CAP_EFFECTIVE\":\"0\",\"_CMDLINE\":\"/usr/sbin/haproxy -sf 1688512 -Ws -f /etc/haproxy/example_dmz/loki.cfg -p /run/haproxy/example_dmz/loki.pid -S /run/haproxy/example_dmz/loki-master.sock\",\"_COMM\":\"haproxy\",\"_EXE\":\"/usr/sbin/haproxy\",\"_GID\":\"123\",\"_HOSTNAME\":\"lb1.dr.example.com\",\"_MACHINE_ID\":\"bd2\",\"_PID\":\"4151570\",\"_SELINUX_CONTEXT\":\"unconfined\\n\",\"_SOURCE_REALTIME_TIMESTAMP\":\"1716915534574747\",\"_SYSTEMD_CGROUP\":\"/system.slice/system-haproxy.slice/haproxy@example_dmz-loki.service\",\"_SYSTEMD_INVOCATION_ID\":\"650\",\"_SYSTEMD_SLICE\":\"system-haproxy.slice\",\"_SYSTEMD_UNIT\":\"haproxy@example_dmz-loki.service\",\"_TRANSPORT\":\"syslog\",\"_UID\":\"115\"}"
     ,"observed_timestamp":"2024-05-28T16:58:54.776220907Z"
-    ,"source_type":"opentelemetry"
-    ,"timestamp":"2024-05-28T16:58:54.575273Z"}"#;
+    ,"source_type":"opentelemetry,"timestamp":"2024-05-28T16:58:54.575273Z"}
+    "#;
 
     pub static K8S: &[u8] = br#"
     {"attributes":{"cluster":"k8s-starwars","host":"master.sith.starwars"
@@ -243,8 +296,8 @@ pub mod samples {
     ,"time_unix_nano":1716915530505521000},"dropped_attributes_count":0
     ,"message":"{\"MESSAGE\":\"W0528 18:58:50.244507 3818486 reflector.go:539] storage/cacher.go:/aquasecurity.github.io/vulnerabilityreports: failed to list aquasecurity.github.io/v1alpha1, Kind=VulnerabilityReport: etcdserver: request timed out\",\"PRIORITY\":\"6\",\"SYSLOG_FACILITY\":\"3\",\"SYSLOG_IDENTIFIER\":\"kube-apiserver\",\"_BOOT_ID\":\"050\",\"_CAP_EFFECTIVE\":\"1ffffffffff\",\"_CMDLINE\":\"/usr/bin/kube-apiserver --allow-privileged=true --anonymous-auth=false --authorization-mode=Node,RBAC --audit-policy-file=/etc/kubernetes/audit-policy.yaml --audit-log-path=/var/log/kubernetes/audit/audit.log --audit-log-maxage=3 --audit-log-maxbackup=0 --audit-log-maxsize=200 --bind-address=127.0.0.1 --client-ca-file=/etc/kubernetes/pki/ca.crt --etcd-servers=https://10.3.2.47:2379,https://10.3.2.49:2379,https://10.3.2.51:2379 --etcd-cafile=/etc/kubernetes/pki/etcd/ca.crt --etcd-certfile=/etc/kubernetes/pki/apiserver-etcd-client.crt --etcd-keyfile=/etc/kubernetes/pki/apiserver-etcd-client.key --etcd-prefix=/registry --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname --kubelet-client-certificate=/etc/kubernetes/pki/apiserver-kubelet-client.crt --kubelet-client-key=/etc/kubernetes/pki/apiserver-kubelet-client.key --proxy-client-cert-file=/etc/kubernetes/pki/front-proxy-client.crt --proxy-client-key-file=/etc/kubernetes/pki/front-proxy-client.key --requestheader-client-ca-file=/etc/kubernetes/pki/front-proxy-ca.crt --requestheader-allowed-names=front-proxy-client --requestheader-username-headers=X-Remote-User --requestheader-group-headers=X-Remote-Group --requestheader-extra-headers-prefix=X-Remote-Extra- --service-account-issuer=https://kubernetes --service-cluster-ip-range=10.3.0.0/24 --service-account-key-file=/etc/kubernetes/pki/sa.pub --service-account-signing-key-file=/etc/kubernetes/pki/sa.key --tls-cert-file=/etc/kubernetes/pki/apiserver.crt --tls-private-key-file=/etc/kubernetes/pki/apiserver.key\",\"_COMM\":\"kube-apiserver\",\"_EXE\":\"/usr/bin/kube-apiserver\",\"_GID\":\"0\",\"_HOSTNAME\":\"master.sith.starwars\",\"_MACHINE_ID\":\"3ca\",\"_PID\":\"3818486\",\"_SELINUX_CONTEXT\":\"unconfined\\n\",\"_STREAM_ID\":\"ced\",\"_SYSTEMD_CGROUP\":\"/system.slice/kube-apiserver.service\",\"_SYSTEMD_INVOCATION_ID\":\"cdc\",\"_SYSTEMD_SLICE\":\"system.slice\",\"_SYSTEMD_UNIT\":\"kube-apiserver.service\",\"_TRANSPORT\":\"stdout\",\"_UID\":\"0\"}"
     ,"observed_timestamp":"2024-05-28T16:58:50.887807787Z"
-    ,"source_type":"opentelemetry"
-    ,"timestamp":"2024-05-28T16:58:50.505521Z"}"#;
+    ,"source_type":"opentelemetry","timestamp":"2024-05-28T16:58:50.505521Z"}
+    "#;
 
     pub static KERNEL_AUDIT: &[u8] = br#"
     {"attributes":{"cluster":"k8s-acme-prod-backend1","host":"node1.acme.tld"
@@ -255,8 +308,8 @@ pub mod samples {
     ,"dropped_attributes_count":0
     ,"message":"{\"AUDIT_FIELD_ACCT\":\"zabbix\",\"AUDIT_FIELD_ADDR\":\"?\",\"AUDIT_FIELD_EXE\":\"/usr/bin/sudo\",\"AUDIT_FIELD_GRANTORS\":\"pam_permit\",\"AUDIT_FIELD_HOSTNAME\":\"?\",\"AUDIT_FIELD_OP\":\"PAM:accounting\",\"AUDIT_FIELD_RES\":\"success\",\"AUDIT_FIELD_TERMINAL\":\"?\",\"MESSAGE\":\"USER_ACCT pid=1417310 uid=110 auid=4294967295 ses=4294967295 subj=unconfined msg='op=PAM:accounting grantors=pam_permit acct=\\\"zabbix\\\" exe=\\\"/usr/bin/sudo\\\" hostname=? addr=? terminal=? res=success'\",\"SYSLOG_FACILITY\":\"4\",\"SYSLOG_IDENTIFIER\":\"audit\",\"_AUDIT_ID\":\"13817439\",\"_AUDIT_LOGINUID\":\"4294967295\",\"_AUDIT_SESSION\":\"4294967295\",\"_AUDIT_TYPE\":\"1101\",\"_AUDIT_TYPE_NAME\":\"USER_ACCT\",\"_BOOT_ID\":\"284\",\"_HOSTNAME\":\"node1.acme.tld\",\"_MACHINE_ID\":\"ca7\",\"_PID\":\"1417310\",\"_SELINUX_CONTEXT\":\"unconfined\",\"_SOURCE_REALTIME_TIMESTAMP\":\"1717588833260000\",\"_TRANSPORT\":\"audit\",\"_UID\":\"110\"}"
     ,"observed_timestamp":"2024-06-05T12:00:33.648370149Z"
-    ,"source_type":"opentelemetry"
-    ,"timestamp":"2024-06-05T12:00:33.264832Z"}"#;
+    ,"source_type":"opentelemetry","timestamp":"2024-06-05T12:00:33.264832Z"}
+    "#;
 
     pub static KERNEL_IPTABLES: &[u8] = br#"
     {"attributes":{"cluster":"k8s","host":"example.com"
@@ -267,8 +320,8 @@ pub mod samples {
     ,"dropped_attributes_count":0
     ,"message":"{\"MESSAGE\":\"IN= OUT=ens19 SRC=10.1.2.3 DST=10.1.2.4 LEN=177 TOS=0x00 PREC=0x00 TTL=64 ID=35588 PROTO=UDP SPT=49988 DPT=8472 LEN=157 MARK=0xc00 \",\"PRIORITY\":\"4\",\"SYSLOG_FACILITY\":\"0\",\"SYSLOG_IDENTIFIER\":\"kernel\",\"_BOOT_ID\":\"fcb\",\"_HOSTNAME\":\"example.com\",\"_MACHINE_ID\":\"356\",\"_SOURCE_MONOTONIC_TIMESTAMP\":\"8646102285350\",\"_TRANSPORT\":\"kernel\"}"
     ,"observed_timestamp":"2024-06-05T12:00:58.433717607Z"
-    ,"source_type":"opentelemetry"
-    ,"timestamp":"2024-06-05T12:00:58.128394Z"}"#;
+    ,"source_type":"opentelemetry","timestamp":"2024-06-05T12:00:58.128394Z"}
+    "#;
 
     pub static KERNEL_IPTABLES2: &[u8] = br#"
     {"attributes":{"host":"lb.example.com"
@@ -278,8 +331,8 @@ pub mod samples {
     ,"time_unix_nano":1717594098186173000},"dropped_attributes_count":0
     ,"message":"{\"MESSAGE\":\"OUTPUT:DROP: IN= OUT=enp2s0.123 SRC=10.123.1.1 DST=10.123.1.2 LEN=60 TOS=0x00 PREC=0x00 TTL=64 ID=61632 DF PROTO=TCP SPT=23948 DPT=30080 WINDOW=64240 RES=0x00 SYN URGP=0 \",\"PRIORITY\":\"6\",\"SYSLOG_FACILITY\":\"0\",\"SYSLOG_IDENTIFIER\":\"kernel\",\"_BOOT_ID\":\"27e\",\"_HOSTNAME\":\"lb.example.com\",\"_MACHINE_ID\":\"9e2\",\"_SOURCE_MONOTONIC_TIMESTAMP\":\"41035084405569\",\"_TRANSPORT\":\"kernel\"}"
     ,"observed_timestamp":"2024-06-05T13:28:18.353743180Z"
-    ,"source_type":"opentelemetry"
-    ,"timestamp":"2024-06-05T13:28:18.186173Z"}"#;
+    ,"source_type":"opentelemetry","timestamp":"2024-06-05T13:28:18.186173Z"}
+    "#;
 
     pub static NGINX: &[u8] = br#"
     {"attributes":{"filename":"/var/log/nginx/cust1/prd-access.log",
@@ -304,8 +357,8 @@ pub mod samples {
     ,"dropped_attributes_count":0
     ,"message":"{\"MESSAGE\":\"{\\\"action\\\":\\\"workon\\\",\\\"user\\\":\\\"johndoe\\\",\\\"ticket\\\":\\\"https://remote-url/issues/69\\\",\\\"description\\\":\\\"nats2jetstream-work\\\"}\",\"PRIORITY\":\"4\",\"SYSLOG_FACILITY\":\"10\",\"SYSLOG_IDENTIFIER\":\"osso-change\",\"SYSLOG_TIMESTAMP\":\"May 30 16:50:23 \",\"_BOOT_ID\":\"0f7\",\"_COMM\":\"logger\",\"_GID\":\"1005\",\"_HOSTNAME\":\"some.server\",\"_MACHINE_ID\":\"fd4\",\"_PID\":\"105815\",\"_SOURCE_REALTIME_TIMESTAMP\":\"1717080624000014\",\"_TRANSPORT\":\"syslog\",\"_UID\":\"1005\"}"
     ,"observed_timestamp":"2024-05-30T14:50:24.340039502Z"
-    ,"source_type":"opentelemetry"
-    ,"timestamp":"2024-05-30T14:50:24.000032Z"}"#;
+    ,"source_type":"opentelemetry","timestamp":"2024-05-30T14:50:24.000032Z"}
+    "#;
 
     pub static SYSLOG_AUDIT: &[u8] = br#"
     {"attributes":{"host":"lb.example.com"
@@ -316,8 +369,8 @@ pub mod samples {
     ,"time_unix_nano":1717588861193959000},"dropped_attributes_count":0
     ,"message":"{\"MESSAGE\":\"pam_unix(cron:session): session opened for user root by (uid=0)\",\"PRIORITY\":\"6\",\"SYSLOG_FACILITY\":\"10\",\"SYSLOG_IDENTIFIER\":\"CRON\",\"SYSLOG_PID\":\"3825520\",\"SYSLOG_TIMESTAMP\":\"Jun  5 14:01:01 \",\"_AUDIT_LOGINUID\":\"0\",\"_AUDIT_SESSION\":\"5133381\",\"_BOOT_ID\":\"f9b\",\"_CAP_EFFECTIVE\":\"3fffffffff\",\"_CMDLINE\":\"/usr/sbin/CRON -f\",\"_COMM\":\"cron\",\"_EXE\":\"/usr/sbin/cron\",\"_GID\":\"0\",\"_HOSTNAME\":\"lb.example.com\",\"_MACHINE_ID\":\"9da\",\"_PID\":\"3825520\",\"_SELINUX_CONTEXT\":\"unconfined\\n\",\"_SOURCE_REALTIME_TIMESTAMP\":\"1717588861193047\",\"_SYSTEMD_CGROUP\":\"/system.slice/cron.service\",\"_SYSTEMD_INVOCATION_ID\":\"f20\",\"_SYSTEMD_SLICE\":\"system.slice\",\"_SYSTEMD_UNIT\":\"cron.service\",\"_TRANSPORT\":\"syslog\",\"_UID\":\"0\"}"
     ,"observed_timestamp":"2024-06-05T12:01:01.410850513Z"
-    ,"source_type":"opentelemetry"
-    ,"timestamp":"2024-06-05T12:01:01.193959Z"}"#;
+    ,"source_type":"opentelemetry","timestamp":"2024-06-05T12:01:01.193959Z"}
+    "#;
 
     pub static SYSLOG_AUDIT2: &[u8] = br#"
     {"attributes":{"host":"lb.example.com"
@@ -328,8 +381,8 @@ pub mod samples {
     ,"time_unix_nano":1717594440187604000},"dropped_attributes_count":0
     ,"message":"{\"MESSAGE\":\"pam_unix(sudo:session): session closed for user root\",\"PRIORITY\":\"6\",\"SYSLOG_FACILITY\":\"10\",\"SYSLOG_IDENTIFIER\":\"sudo\",\"SYSLOG_TIMESTAMP\":\"Jun  5 15:34:00 \",\"_BOOT_ID\":\"f9b\",\"_CAP_EFFECTIVE\":\"3fffffffff\",\"_CMDLINE\":\"sudo iptables -S FORWARD -w\",\"_COMM\":\"sudo\",\"_EXE\":\"/usr/bin/sudo\",\"_GID\":\"0\",\"_HOSTNAME\":\"lb.example.com\",\"_MACHINE_ID\":\"9da\",\"_PID\":\"3871095\",\"_SELINUX_CONTEXT\":\"unconfined\\n\",\"_SOURCE_REALTIME_TIMESTAMP\":\"1717594440187575\",\"_SYSTEMD_CGROUP\":\"/system.slice/zabbix-agent.service\",\"_SYSTEMD_INVOCATION_ID\":\"299\",\"_SYSTEMD_SLICE\":\"system.slice\",\"_SYSTEMD_UNIT\":\"zabbix-agent.service\",\"_TRANSPORT\":\"syslog\",\"_UID\":\"0\"}"
     ,"observed_timestamp":"2024-06-05T13:34:00.522496966Z"
-    ,"source_type":"opentelemetry"
-    ,"timestamp":"2024-06-05T13:34:00.187604Z"}"#;
+    ,"source_type":"opentelemetry","timestamp":"2024-06-05T13:34:00.187604Z"}
+    "#;
 
     pub static TETRAGON_AUDIT: &[u8] = br#"
     {"attributes":{"cluster":"backup.cloud","host":"abc.backup.cloud"
@@ -340,8 +393,8 @@ pub mod samples {
     ,"time_unix_nano":1717078743355971000},"dropped_attributes_count":0
     ,"message":"{\"MESSAGE\":\"{\\\"process_exec\\\":{\\\"process\\\":{\\\"pid\\\":3987149,\\\"uid\\\":0,\\\"cwd\\\":\\\"/\\\",\\\"binary\\\":\\\"/usr/bin/find\\\",\\\"arguments\\\":\\\"/var/lib/landscape/landscape-sysinfo.cache -newermt \\\\\\\"now-1 minutes\\\\\\\"\\\",\\\"auid\\\":1000,\\\"process_credentials\\\":{\\\"uid\\\":0,\\\"gid\\\":0,\\\"euid\\\":0,\\\"egid\\\":0,\\\"suid\\\":0,\\\"sgid\\\":0,\\\"fsuid\\\":0,\\\"fsgid\\\":0}},\\\"parent\\\":{\\\"pid\\\":3987148,\\\"cwd\\\":\\\"/\\\",\\\"binary\\\":\\\"/etc/update-motd.d/50-landscape-sysinfo\\\"}},\\\"time\\\":\\\"2024-05-30T14:19:03.355389934Z\\\"}\",\"PRIORITY\":\"6\",\"SYSLOG_FACILITY\":\"3\",\"SYSLOG_IDENTIFIER\":\"tetragon-cat\",\"_BOOT_ID\":\"f6f\",\"_CAP_EFFECTIVE\":\"1ffffffffff\",\"_CMDLINE\":\"grep --line-buffered \\\"\\\\\\\"auid\\\\\\\":[0-9]\\\\\\\\{4\\\\\\\\}[,}]\\\"\",\"_COMM\":\"grep\",\"_EXE\":\"/usr/bin/grep\",\"_GID\":\"0\",\"_HOSTNAME\":\"abc.backup.cloud\",\"_MACHINE_ID\":\"21a\",\"_PID\":\"6499\",\"_SELINUX_CONTEXT\":\"unconfined\\n\",\"_STREAM_ID\":\"eaa\",\"_SYSTEMD_CGROUP\":\"/system.slice/tetragon-cat.service\",\"_SYSTEMD_INVOCATION_ID\":\"e36\",\"_SYSTEMD_SLICE\":\"system.slice\",\"_SYSTEMD_UNIT\":\"tetragon-cat.service\",\"_TRANSPORT\":\"stdout\",\"_UID\":\"0\"}"
     ,"observed_timestamp":"2024-05-30T14:19:03.375327083Z"
-    ,"source_type":"opentelemetry"
-    ,"timestamp":"2024-05-30T14:19:03.355971Z"}"#;
+    ,"source_type":"opentelemetry","timestamp":"2024-05-30T14:19:03.355971Z"}
+    "#;
 
     pub static UNKNOWN: &[u8] = br#"
     {"attributes":{"filename":"/var/log/unknown.log"
@@ -356,6 +409,21 @@ pub mod samples {
     ,"observed_timestamp":"2024-05-28T16:59:05.531255460Z"
     ,"source_type":"opentelemetry"
     ,"timestamp":"2024-05-28T16:59:05.530820428Z"}"#;
+
+    // This is generated by logger/systemd-cat from a cron job. This
+    // should not end up in any "cron" daemon pile.
+    pub static UNKNOWN2: &[u8] = br#"
+    {"attributes":{"host":"unknown.example.com"
+    ,"job":"loki.source.journal.logs_journald_generic"
+    ,"loki.attribute.labels":"systemd_unit,job"
+    ,"observed_time_unix_nano":1717605601678748460
+    ,"section":"unknown-section","systemd_unit":"cron.service"
+    ,"tenant":"unknown-tenant","time_unix_nano":1717605601481345000}
+    ,"dropped_attributes_count":0
+    ,"message":"{\"MESSAGE\":\"[REDIS Keyspace] db0:keys=1,expires=0,avg_ttl=0 db1:keys=48142,expires=0,avg_ttl=0 db2:keys=178368,expires=0,avg_ttl=0 db3:keys=5,expires=0,avg_ttl=0 db4:keys=384,expires=0,avg_ttl=0 db5:keys=17,expires=0,avg_ttl=0 db6:keys=17,expires=0,avg_ttl=0 db8:keys=5,expires=0,avg_ttl=0 db9:keys=5,expires=0,avg_ttl=0 db10:keys=17,expires=0,avg_ttl=0 db12:keys=17,expires=0,avg_ttl=0 db13:keys=19082,expires=0,avg_ttl=0 db14:keys=5,expires=0,avg_ttl=0 db15:keys=5,expires=0,avg_ttl=0 db16:keys=24590,expires=0,avg_ttl=0 db18:keys=17,expires=0,avg_ttl=0 db19:keys=8054,expires=0,avg_ttl=0 db20:keys=17,expires=0,avg_ttl=0 db21:keys=4285,expires=0,avg_ttl=0 db23:keys=17,expires=0,avg_ttl=0 db25:keys=15659,expires=0,avg_ttl=0 db26:keys=13985,expires=0,avg_ttl=0 db27:keys=17,expires=0,avg_ttl=0\",\"PRIORITY\":\"6\",\"SYSLOG_IDENTIFIER\":\"redis-stats\",\"_AUDIT_LOGINUID\":\"0\",\"_AUDIT_SESSION\":\"259108\",\"_BOOT_ID\":\"be8\",\"_CAP_EFFECTIVE\":\"1ffffffffff\",\"_COMM\":\"cat\",\"_GID\":\"0\",\"_HOSTNAME\":\"unknown.example.com\",\"_LINE_BREAK\":\"eof\",\"_MACHINE_ID\":\"bb6\",\"_PID\":\"342645\",\"_SELINUX_CONTEXT\":\"unconfined\\n\",\"_STREAM_ID\":\"0c8\",\"_SYSTEMD_CGROUP\":\"/system.slice/cron.service\",\"_SYSTEMD_INVOCATION_ID\":\"797\",\"_SYSTEMD_SLICE\":\"system.slice\",\"_SYSTEMD_UNIT\":\"cron.service\",\"_TRANSPORT\":\"stdout\",\"_UID\":\"0\"}"
+    ,"observed_timestamp":"2024-06-05T16:40:01.678748460Z"
+    ,"source_type":"opentelemetry","timestamp":"2024-06-05T16:40:01.481345Z"}
+    "#;
 }
 
 
@@ -394,6 +462,35 @@ mod tests {
     }
 
     #[test]
+    fn test_match_auditd() {
+        let attrs = BytesAttributes::from_payload(samples::AUDITD).expect("parse error");
+        let match_ = Match::from_attributes(&attrs).expect("match error");
+        assert_eq!(match_.subject, "bulk.audit.T.S.H");
+    }
+
+    #[test]
+    fn test_match_devinfra() {
+        let payloads: [&[u8]; 3] = [
+            br#"{"attributes":{"systemd_unit":"clamav-daemon.service","host":"H","tenant":"T","section":"S"},"message":"M"}"#,
+            br#"{"attributes":{"systemd_unit":"clamav-freshclam.service","host":"H","tenant":"T","section":"S"},"message":"M"}"#,
+            br#"{"attributes":{"systemd_unit":"tetragon.service","host":"H","tenant":"T","section":"S"},"message":"M"}"#,
+        ];
+        for payload in &payloads {
+            let attrs = BytesAttributes::from_payload(payload).expect("parse error");
+            let match_ = Match::from_attributes(&attrs).expect("match error");
+            assert_eq!(match_.subject, "bulk.hids.T.S.H");
+        }
+    }
+
+
+    #[test]
+    fn test_match_etcd() {
+        let attrs = BytesAttributes::from_payload(samples::ETCD).expect("parse error");
+        let match_ = Match::from_attributes(&attrs).expect("match error");
+        assert_eq!(match_.subject, "bulk.etcd.T.S.H");
+    }
+
+    #[test]
     fn test_match_haproxy() {
         let attrs = BytesAttributes::from_payload(samples::HAPROXY).expect("parse error");
         let match_ = Match::from_attributes(&attrs).expect("match error");
@@ -401,10 +498,36 @@ mod tests {
     }
 
     #[test]
+    fn test_match_hids() {
+        let payloads: [&[u8]; 3] = [
+            br#"{"attributes":{"systemd_unit":"clamav-daemon.service","host":"H","tenant":"T","section":"S"},"message":"M"}"#,
+            br#"{"attributes":{"systemd_unit":"clamav-freshclam.service","host":"H","tenant":"T","section":"S"},"message":"M"}"#,
+            br#"{"attributes":{"systemd_unit":"tetragon.service","host":"H","tenant":"T","section":"S"},"message":"M"}"#,
+        ];
+        for payload in &payloads {
+            let attrs = BytesAttributes::from_payload(payload).expect("parse error");
+            let match_ = Match::from_attributes(&attrs).expect("match error");
+            assert_eq!(match_.subject, "bulk.hids.T.S.H");
+        }
+    }
+
+    #[test]
     fn test_match_k8s() {
         let attrs = BytesAttributes::from_payload(samples::K8S).expect("parse error");
         let match_ = Match::from_attributes(&attrs).expect("match error");
         assert_eq!(match_.subject, "bulk.k8s.acme.starwars.master-sith-starwars");
+
+        let payloads: [&[u8]; 4] = [
+            br#"{"attributes":{"systemd_unit":"kube-apiserver.service","host":"H","tenant":"T","section":"S"},"message":"M"}"#,
+            br#"{"attributes":{"systemd_unit":"kube-controller-manager.service","host":"H","tenant":"T","section":"S"},"message":"M"}"#,
+            br#"{"attributes":{"systemd_unit":"kube-scheduler.service","host":"H","tenant":"T","section":"S"},"message":"M"}"#,
+            br#"{"attributes":{"systemd_unit":"kubelet.service","host":"H","tenant":"T","section":"S"},"message":"M"}"#,
+        ];
+        for payload in &payloads {
+            let attrs = BytesAttributes::from_payload(payload).expect("parse error");
+            let match_ = Match::from_attributes(&attrs).expect("match error");
+            assert_eq!(match_.subject, "bulk.k8s.T.S.H");
+        }
     }
 
     #[test]
@@ -513,6 +636,21 @@ mod tests {
     }
 
     #[test]
+    fn test_match_v12n() {
+        let payloads: [&[u8]; 4] = [
+            br#"{"attributes":{"systemd_unit":"containerd.service","host":"H","tenant":"T","section":"S"},"message":"M"}"#,
+            br#"{"attributes":{"systemd_unit":"ctre.service","host":"H","tenant":"T","section":"S"},"message":"M"}"#,
+            br#"{"attributes":{"systemd_unit":"docker.service","host":"H","tenant":"T","section":"S"},"message":"M"}"#,
+            br#"{"attributes":{"systemd_unit":"docker@someservice.service","host":"H","tenant":"T","section":"S"},"message":"M"}"#,
+        ];
+        for payload in &payloads {
+            let attrs = BytesAttributes::from_payload(payload).expect("parse error");
+            let match_ = Match::from_attributes(&attrs).expect("match error");
+            assert_eq!(match_.subject, "bulk.v12n.T.S.H");
+        }
+    }
+
+    #[test]
     fn test_match_vault() {
         let payloads: [&[u8]; 2] = [
             br#"{"attributes":{"filename":"/var/log/vault/audit.log","host":"H","tenant":"T","section":"S"},"message":"M"}"#,
@@ -527,8 +665,11 @@ mod tests {
 
     #[test]
     fn test_match_unknown() {
-        let attrs = BytesAttributes::from_payload(samples::UNKNOWN).expect("parse error");
-        let match_ = Match::from_attributes(&attrs).expect("match error");
-        assert_eq!(match_.subject, "bulk.unknown.unknown-tenant.unknown-section.unknown-example-com");
+        let payloads: [&[u8]; 2] = [samples::UNKNOWN, samples::UNKNOWN2];
+        for payload in &payloads {
+            let attrs = BytesAttributes::from_payload(payload).expect("parse error");
+            let match_ = Match::from_attributes(&attrs).expect("match error");
+            assert_eq!(match_.subject, "bulk.unknown.unknown-tenant.unknown-section.unknown-example-com");
+        }
     }
 }
