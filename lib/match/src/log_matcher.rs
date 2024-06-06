@@ -156,6 +156,13 @@ impl Match {
             });
         }
 
+        if attrs.systemd_unit == b"ssh.service" {
+            return Ok(Match {
+                // destination: "bulk_match_ssh",
+                subject: format!("bulk.ssh.{tenant}.{section}.{hostname}"),
+            });
+        }
+
         if attrs.systemd_unit == b"tetragon.service" ||
                 (starts_with(attrs.systemd_unit, b"clamav-") &&
                  ends_with(attrs.systemd_unit, b".service")) {
@@ -631,6 +638,42 @@ mod tests {
         let attrs = BytesAttributes::from_payload(samples::NGINX).expect("parse error");
         let match_ = Match::from_attributes(&attrs).expect("match error");
         assert_eq!(match_.subject, "bulk.nginx.acme.cust1.lb1-zl-example-com");
+    }
+
+    #[test]
+    fn test_match_ssh() {
+        let payloads: [&[u8]; 1] = [
+            // $ GEN_BLOB | jq -r .message | jq .MESSAGE |
+            //   sed -e 's/ user [^ ]*/ user <U>/;s/port [0-9]\+/port <P>/;s/\([0-9]*[.]\)\{3\}[0-9]*/<A>/' |
+            //   sort -u
+            // "Accepted publickey for git from <A> port <P> ssh2: ED25519 SHA256:<hash>"
+            // "Accepted publickey for remotebackup from <A> port <P> ssh2: ED25519 SHA256:<hash>"
+            // "banner exchange: Connection from <A> port <P>: could not read protocol version"
+            // "banner exchange: Connection from <A> port <P>: invalid format"
+            // "Connection closed by <A> port <P>"
+            // "Connection closed by <A> port <P> [preauth]"
+            // "Connection closed by invalid user <U> <A> port <P> [preauth]"
+            // "Connection reset by <A> port <P>"
+            // "Disconnected from authenticating user <U> <A> port <P> [preauth]"
+            // "Disconnected from invalid user <U> <A> port <P> [preauth]"
+            // "error: kex_exchange_identification: banner line contains invalid characters"
+            // "error: kex_exchange_identification: client sent invalid protocol identifier \"${jndi:ldap://<A>#172.21.0.6:19960/a}\""
+            // "error: kex_exchange_identification: Connection closed by remote host"
+            // "error: kex_exchange_identification: read: Connection reset by peer"
+            // "error: Protocol major versions differ: 2 vs. 0"
+            // "error: Protocol major versions differ: 2 vs. 1"
+            // "Failed none for invalid user <U> from <A> port <P> ssh2"
+            // "Failed password for invalid user <U> from <A> port <P> ssh2"
+            // "Failed password for root from <A> port <P> ssh2"
+            // "Invalid user <U> from <A> port <P>"
+            // "Received disconnect from <A> port <P>:11: Bye Bye [preauth]"
+            br#"{"attributes":{"systemd_unit":"ssh.service","host":"H","tenant":"T","section":"S"},"message":"M"}"#,
+        ];
+        for payload in &payloads {
+            let attrs = BytesAttributes::from_payload(payload).expect("parse error");
+            let match_ = Match::from_attributes(&attrs).expect("match error");
+            assert_eq!(match_.subject, "bulk.ssh.T.S.H");
+        }
     }
 
     #[test]
