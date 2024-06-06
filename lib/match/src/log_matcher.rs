@@ -180,6 +180,17 @@ impl Match {
             });
         }
 
+        if attrs.systemd_unit == b"aide.service" ||
+                attrs.systemd_unit == b"aidecheck.service" ||
+                attrs.systemd_unit == b"aidecheck.timer" ||
+                attrs.systemd_unit == b"dailyaidecheck.service" ||
+                attrs.systemd_unit == b"dailyaidecheck.timer" {
+            return Ok(Match {
+                // destination: "bulk_match_aide",
+                subject: format!("bulk.aide.{tenant}.{section}.{hostname}"),
+            });
+        }
+
         if attrs.has_no_origin() {
             // TODO: Do we want to decode .message here? Or just do
             // substring matching like this:
@@ -487,6 +498,22 @@ mod tests {
         assert!(memmem(b"", b"nope").is_none());
         assert!(memmem(b"ye", b"yea").is_none());
         assert!(memmem(b"yeap", b"nope").is_none());
+    }
+
+    #[test]
+    fn test_match_aide() {
+        let payloads: [&[u8]; 5] = [
+            br#"{"attributes":{"systemd_unit":"aide.service","host":"H","tenant":"T","section":"S"},"message":"M"}"#,
+            br#"{"attributes":{"systemd_unit":"aidecheck.service","host":"H","tenant":"T","section":"S"},"message":"M"}"#,
+            br#"{"attributes":{"systemd_unit":"aidecheck.timer","host":"H","tenant":"T","section":"S"},"message":"M"}"#,
+            br#"{"attributes":{"systemd_unit":"dailyaidecheck.service","host":"H","tenant":"T","section":"S"},"message":"M"}"#,
+            br#"{"attributes":{"systemd_unit":"dailyaidecheck.timer","host":"H","tenant":"T","section":"S"},"message":"M"}"#,
+        ];
+        for payload in &payloads {
+            let attrs = BytesAttributes::from_payload(payload).expect("parse error");
+            let match_ = Match::from_attributes(&attrs).expect("match error");
+            assert_eq!(match_.subject, "bulk.aide.T.S.H");
+        }
     }
 
     #[test]
