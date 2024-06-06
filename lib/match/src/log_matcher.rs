@@ -343,14 +343,6 @@ pub mod samples {
     ,"source_type":"opentelemetry"
     ,"timestamp":"2024-05-30T14:19:03.355971Z"}"#;
 
-    pub static VAULT_AUDIT: &[u8] = br#"
-    {"attributes":{"filename":"/var/log/vault/audit.log","host":"H"
-    ,"tenant":"T","section":"S"},"message":"M"}"#;
-
-    pub static VAULT_SERVICE: &[u8] = br#"
-    {"attributes":{"systemd_unit":"vault.service","host":"H"
-    ,"tenant":"T","section":"S"},"message":"M"}"#;
-
     pub static UNKNOWN: &[u8] = br#"
     {"attributes":{"filename":"/var/log/unknown.log"
     ,"host":"unknown.example.com","log.file.name":"unknown.log"
@@ -417,9 +409,14 @@ mod tests {
 
     #[test]
     fn test_match_k8s_audit() {
-        let attrs = BytesAttributes::from_payload(samples::K8S).expect("parse error");
-        let match_ = Match::from_attributes(&attrs).expect("match error");
-        assert_eq!(match_.subject, "bulk.k8s.acme.starwars.master-sith-starwars");
+        let payloads: [&[u8]; 1] = [
+            br#"{"attributes":{"filename":"/var/log/kubernetes/audit/audit.log","host":"H","tenant":"T","section":"S"},"message":"M"}"#,
+        ];
+        for payload in &payloads {
+            let attrs = BytesAttributes::from_payload(payload).expect("parse error");
+            let match_ = Match::from_attributes(&attrs).expect("match error");
+            assert_eq!(match_.subject, "bulk.k8s-audit.T.S.H");
+        }
     }
 
     #[test]
@@ -438,6 +435,33 @@ mod tests {
         let attrs = BytesAttributes::from_payload(samples::KERNEL_IPTABLES2).expect("parse error");
         let match_ = Match::from_attributes(&attrs).expect("match error");
         assert_eq!(match_.subject, "bulk.firewall.T.S.lb-example-com");
+    }
+
+    #[test]
+    fn test_match_monitoring() {
+        let payloads: [&[u8]; 4] = [
+            br#"{"attributes":{"systemd_unit":"gocollect.service","host":"H","tenant":"T","section":"S"},"message":"M"}"#,
+            br#"{"attributes":{"systemd_unit":"zabbix-agent.service","host":"H","tenant":"T","section":"S"},"message":"M"}"#,
+            br#"{"attributes":{"systemd_unit":"zabbix-proxy.service","host":"H","tenant":"T","section":"S"},"message":"M"}"#,
+            br#"{"attributes":{"systemd_unit":"zabbix-server.service","host":"H","tenant":"T","section":"S"},"message":"M"}"#,
+        ];
+        for payload in &payloads {
+            let attrs = BytesAttributes::from_payload(payload).expect("parse error");
+            let match_ = Match::from_attributes(&attrs).expect("match error");
+            assert_eq!(match_.subject, "bulk.monitoring.T.S.H");
+        }
+    }
+
+    #[test]
+    fn test_match_nids() {
+        let payloads: [&[u8]; 1] = [
+            br#"{"attributes":{"systemd_unit":"suricata.service","host":"H","tenant":"T","section":"S"},"message":"M"}"#,
+        ];
+        for payload in &payloads {
+            let attrs = BytesAttributes::from_payload(payload).expect("parse error");
+            let match_ = Match::from_attributes(&attrs).expect("match error");
+            assert_eq!(match_.subject, "bulk.nids.T.S.H");
+        }
     }
 
     #[test]
@@ -466,6 +490,22 @@ mod tests {
     }
 
     #[test]
+    fn test_match_systemd() {
+        let payloads: [&[u8]; 5] = [
+            br#"{"attributes":{"systemd_unit":"init.scope","host":"H","tenant":"T","section":"S"},"message":"M"}"#,
+            br#"{"attributes":{"systemd_unit":"session-1234.scope","host":"H","tenant":"T","section":"S"},"message":"M"}"#,
+            br#"{"attributes":{"systemd_unit":"systemd-networkd.service","host":"H","tenant":"T","section":"S"},"message":"M"}"#,
+            br#"{"attributes":{"systemd_unit":"systemd-udev.service","host":"H","tenant":"T","section":"S"},"message":"M"}"#,
+            br#"{"attributes":{"systemd_unit":"user@1234.service","host":"H","tenant":"T","section":"S"},"message":"M"}"#,
+        ];
+        for payload in &payloads {
+            let attrs = BytesAttributes::from_payload(payload).expect("parse error");
+            let match_ = Match::from_attributes(&attrs).expect("match error");
+            assert_eq!(match_.subject, "bulk.systemd.T.S.H");
+        }
+    }
+
+    #[test]
     fn test_match_tetragon_audit() {
         let attrs = BytesAttributes::from_payload(samples::TETRAGON_AUDIT).expect("parse error");
         let match_ = Match::from_attributes(&attrs).expect("match error");
@@ -474,13 +514,15 @@ mod tests {
 
     #[test]
     fn test_match_vault() {
-        let attrs = BytesAttributes::from_payload(samples::VAULT_AUDIT).expect("parse error");
-        let match_ = Match::from_attributes(&attrs).expect("match error");
-        assert_eq!(match_.subject, "bulk.vault.T.S.H");
-
-        let attrs = BytesAttributes::from_payload(samples::VAULT_SERVICE).expect("parse error");
-        let match_ = Match::from_attributes(&attrs).expect("match error");
-        assert_eq!(match_.subject, "bulk.vault.T.S.H");
+        let payloads: [&[u8]; 2] = [
+            br#"{"attributes":{"filename":"/var/log/vault/audit.log","host":"H","tenant":"T","section":"S"},"message":"M"}"#,
+            br#"{"attributes":{"systemd_unit":"vault.service","host":"H","tenant":"T","section":"S"},"message":"M"}"#,
+        ];
+        for payload in &payloads {
+            let attrs = BytesAttributes::from_payload(payload).expect("parse error");
+            let match_ = Match::from_attributes(&attrs).expect("match error");
+            assert_eq!(match_.subject, "bulk.vault.T.S.H");
+        }
     }
 
     #[test]
