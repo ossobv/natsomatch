@@ -1,5 +1,9 @@
 .PHONY: all
-all: test debug release
+all: clippy test debug release
+
+.PHONY: clippy
+clippy:
+	cargo clippy
 
 .PHONY: test
 test:
@@ -9,10 +13,6 @@ test:
 	      echo "WARNING: no test for: $$l"; done
 	cargo test
 
-.PHONY: bench
-bench:
-	cargo bench --features benchmark
-
 .PHONY: debug
 debug:
 	cargo build
@@ -21,3 +21,7 @@ debug:
 release:
 	#cargo install cargo-auditable cargo-audit
 	cargo auditable build --release
+
+.PHONY: bench
+bench:
+	cargo bench --features benchmark

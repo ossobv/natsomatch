@@ -132,7 +132,7 @@ fn parse_dev_config(dev_section: Option<&Value>) -> DevConfig {
 
     if let Some(dev_section) = dev_section {
         let n: i64 = dev_section.get("max_messages_per_batch").and_then(|v| v.as_integer()).unwrap_or(0);
-        max_messages_per_batch = if 1 <= n && n <= 100_000 { n.try_into().unwrap() } else { 100 };
+        max_messages_per_batch = if (1..=100_000).contains(&n) { n.try_into().unwrap() } else { 100 };
     }
 
     DevConfig {

@@ -1,5 +1,9 @@
 .PHONY: all
-all: lib test debug release
+all: lib clippy test debug release
+
+.PHONY: clippy
+clippy:
+	cargo clippy
 
 .PHONY: test
 test:

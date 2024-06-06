@@ -39,7 +39,7 @@ impl Input {
 
         let messages = consumer
             .stream()
-            .max_messages_per_batch(srv.dev.max_messages_per_batch.into())
+            .max_messages_per_batch(srv.dev.max_messages_per_batch)
             .messages()
             .await?;
         println!("Using development settings {:?}", srv.dev);

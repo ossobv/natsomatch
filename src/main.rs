@@ -168,7 +168,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }
 
         eprintln!("FIXME: When do we get out of the iterator loop?");
-        break;
+
+        let forever_stats = forever_stats_io.lock().expect("Lock forever_stats_io fail");
+        let count = forever_stats.get_count();
+        drop(forever_stats);
+        if count > 0 {  // really just to silence clippy..
+            break;
+        }
+
     }
     eprintln!("nats2jetstream shutting down...");
 

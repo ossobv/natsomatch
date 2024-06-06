@@ -60,6 +60,7 @@ impl Match {
             });
         }
 
+        #[allow(clippy::collapsible_if)]
         if memmem(attrs.message, br#"\"_TRANSPORT\":\"syslog\""#).is_some() {
             if memmem(attrs.message, br#"\"_AUDIT_SESSION\":\""#).is_some() ||
                     memmem(attrs.message, br#"\"MESSAGE\":\"pam_unix("#).is_some() ||
@@ -137,6 +138,7 @@ impl Match {
             // TODO: Do we want to decode .message here? Or just do
             // substring matching like this:
 
+            #[allow(clippy::collapsible_if)]
             if memmem(attrs.message, br#"\"_TRANSPORT\":\"kernel\""#).is_some() &&
                         memmem(attrs.message, br#"\"MESSAGE\":\"#).is_some() {
                 if memmem(attrs.message, br#"IN="#).is_some() &&
@@ -408,6 +410,13 @@ mod tests {
 
     #[test]
     fn test_match_k8s() {
+        let attrs = BytesAttributes::from_payload(samples::K8S).expect("parse error");
+        let match_ = Match::from_attributes(&attrs).expect("match error");
+        assert_eq!(match_.subject, "bulk.k8s.acme.starwars.master-sith-starwars");
+    }
+
+    #[test]
+    fn test_match_k8s_audit() {
         let attrs = BytesAttributes::from_payload(samples::K8S).expect("parse error");
         let match_ = Match::from_attributes(&attrs).expect("match error");
         assert_eq!(match_.subject, "bulk.k8s.acme.starwars.master-sith-starwars");
