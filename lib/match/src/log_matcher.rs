@@ -88,7 +88,8 @@ impl Match {
             });
         }
 
-        if attrs.filename == b"/var/log/vault/audit.log" {
+        if attrs.filename == b"/var/log/vault/audit.log" ||
+                attrs.systemd_unit == b"vault.service" {
             return Ok(Match {
                 // destination: "bulk_match_vault",
                 subject: format!("bulk.vault.{tenant}.{section}.{hostname}"),
@@ -337,6 +338,14 @@ pub mod samples {
     ,"source_type":"opentelemetry"
     ,"timestamp":"2024-05-30T14:19:03.355971Z"}"#;
 
+    pub static VAULT_AUDIT: &[u8] = br#"
+    {"attributes":{"filename":"/var/log/vault/audit.log","host":"H"
+    ,"tenant":"T","section":"S"},"message":"M"}"#;
+
+    pub static VAULT_SERVICE: &[u8] = br#"
+    {"attributes":{"systemd_unit":"vault.service","host":"H"
+    ,"tenant":"T","section":"S"},"message":"M"}"#;
+
     pub static UNKNOWN: &[u8] = br#"
     {"attributes":{"filename":"/var/log/unknown.log"
     ,"host":"unknown.example.com","log.file.name":"unknown.log"
@@ -435,6 +444,17 @@ mod tests {
         let attrs = BytesAttributes::from_payload(samples::TETRAGON_AUDIT).expect("parse error");
         let match_ = Match::from_attributes(&attrs).expect("match error");
         assert_eq!(match_.subject, "bulk.execve.acme.backup.abc-backup-cloud");
+    }
+
+    #[test]
+    fn test_match_vault() {
+        let attrs = BytesAttributes::from_payload(samples::VAULT_AUDIT).expect("parse error");
+        let match_ = Match::from_attributes(&attrs).expect("match error");
+        assert_eq!(match_.subject, "bulk.vault.T.S.H");
+
+        let attrs = BytesAttributes::from_payload(samples::VAULT_SERVICE).expect("parse error");
+        let match_ = Match::from_attributes(&attrs).expect("match error");
+        assert_eq!(match_.subject, "bulk.vault.T.S.H");
     }
 
     #[test]
