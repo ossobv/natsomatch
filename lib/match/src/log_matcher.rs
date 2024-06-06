@@ -211,6 +211,9 @@ fn ends_with(bytes: &[u8], suffix: &[u8]) -> bool {
 /// Returns subsequence index i or None if not found
 ///
 fn memmem(haystack: &[u8], needle: &[u8]) -> Option<usize> {
+    if needle.len() > haystack.len() {
+        return None;
+    }
     (0..=(haystack.len() - needle.len())).find(|&i| &haystack[i..i + needle.len()] == needle)
 }
 
@@ -380,6 +383,20 @@ mod tests {
         assert!(ends_with(b"def", b"def"));
         assert!(!ends_with(b"ef", b"def"));
         assert!(!ends_with(b"abcef", b"def"));
+    }
+
+    #[test]
+    fn test_memmem() {
+        assert_eq!(memmem(b"abcdef", b"abc"), Some(0));
+        assert_eq!(memmem(b"abcdef", b"bcd"), Some(1));
+        assert_eq!(memmem(b"abcdef", b"cde"), Some(2));
+        assert_eq!(memmem(b"abcdef", b"def"), Some(3));
+        assert!(memmem(b"abcdef", b"fgh").is_none());
+        assert_eq!(memmem(b"abcdef", b""), Some(0));
+        assert_eq!(memmem(b"", b""), Some(0));
+        assert!(memmem(b"", b"nope").is_none());
+        assert!(memmem(b"ye", b"yea").is_none());
+        assert!(memmem(b"yeap", b"nope").is_none());
     }
 
     #[test]
