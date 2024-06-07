@@ -45,6 +45,7 @@ fn force_string(data: &[u8]) -> &str {
     std::str::from_utf8(data).unwrap()
 }
 
+
 ///
 /// Result of the fast parser.
 ///
@@ -89,7 +90,7 @@ impl<'a> BytesAttributes<'a> {
     }
 
     pub fn has_no_origin(&self) -> bool {
-        self.systemd_unit.len() == 0 && self.filename.len() == 0
+        self.systemd_unit.is_empty() && self.filename.is_empty()
     }
 
     /// Parse the entire payload.
@@ -236,7 +237,8 @@ impl<'a> BytesAttributes<'a> {
         Err("expected token, found something else")
     }
 
-    /// Expect any json value (string, non-string, list, dict) (after optional whitespace).
+    /// Expect any json value (string, non-string, list, dict) (after
+    /// optional whitespace).
     fn consume_value(payload: &'a [u8], i: &mut usize) -> Result<&'a [u8], &'static str> {
         //println!("[consume_value]");
         let ch = Self::skip_whitespace(payload, i)?;
@@ -388,7 +390,6 @@ impl StringAttributes {
         &self.section
     }
 }
-
 
 #[allow(dead_code)]
 ///

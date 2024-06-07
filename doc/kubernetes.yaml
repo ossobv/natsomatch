@@ -1,0 +1,147 @@
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: nats2jetstream-config
+  namespace: nats-workers
+data:
+  config.toml: |
+    [input]
+    # Input source
+    nats.server = 'nats://nats.nats-cluster:4222'
+    nats.auth = { username = 'derek', password = 's3cr3t!' }
+    tls.ca_file = '/etc/tls/nats/client/ca.crt'
+    # Client certificate
+    tls.cert_file = '/etc/tls/nats/client/tls.crt'
+    tls.key_file = '/etc/tls/nats/client/tls.key'
+    # Select manually made consumer from stream
+    nats.stream = 'bulk_unfiltered'
+    nats.consumer = 'bulk_unfiltered_consumer'
+    # Dev stuff
+    dev.max_messages_per_batch = 100
+
+    [sink]
+    # Output target
+    nats.server = 'nats://nats.nats-cluster:4222'
+    nats.auth = { username = 'derek', password = 's3cr3t!' }
+    tls.ca_file = '/etc/tls/nats/client/ca.crt'
+    # Client certificate
+    tls.cert_file = '/etc/tls/nats/client/tls.crt'
+    tls.key_file = '/etc/tls/nats/client/tls.key'
+    # No need to set jetstream name or subjects. The subject generation is
+    # hardcoded for now, based on the message.
+---
+kind: Secret
+apiVersion: v1
+type: kubernetes.io/tls
+metadata:
+  name: nats2jetstream--client-tls
+  namespace: nats-workers
+data:
+  ca.crt: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCg==
+  tls.crt: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCg==
+  tls.key: LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tCg==
+---
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: nats2jetstream
+  namespace: nats-workers
+  labels:
+    app.kubernetes.io/name: nats2jetstream
+    app.kubernetes.io/part-of: audit-security-event-workers
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 3
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: nats2jetstream
+      app.kubernetes.io/part-of: audit-security-event-workers
+  strategy:
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app.kubernetes.io/name: nats2jetstream
+        app.kubernetes.io/part-of: audit-security-event-workers
+    spec:
+      containers:
+      - args:
+        - -c
+        - /etc/nats2jetstream/config.toml
+        command:
+        - /nats2jetstream
+        image: ossobv/nats2jetstream:v0.1.3-2
+        imagePullPolicy: Always
+        name: nats2jetstream
+        ports:
+        - containerPort: 3000
+          name: liveness-port
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /healthz
+            port: liveness-port
+            scheme: HTTP
+          initialDelaySeconds: 15
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 1
+        resources:
+          limits:
+            cpu: "4"
+            memory: 4Gi
+          requests:
+            cpu: 100m
+            memory: 128Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          privileged: false
+          readOnlyRootFilesystem: true
+          seccompProfile:
+            type: RuntimeDefault
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /etc/nats2jetstream
+          name: nats2jetstream-config
+          readOnly: true
+        - mountPath: /etc/tls/nats/client
+          name: nats2jetstream--client-tls
+          readOnly: true
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext:
+        fsGroup: 101
+        runAsNonRoot: true
+        runAsUser: 101
+      terminationGracePeriodSeconds: 30
+      topologySpreadConstraints:
+      - labelSelector:
+          matchLabels:
+            app.kubernetes.io/name: nats2jetstream
+        maxSkew: 1
+        minDomains: 3
+        topologyKey: topology.kubernetes.io/zone
+        whenUnsatisfiable: DoNotSchedule
+      volumes:
+      - configMap:
+          defaultMode: 420
+          name: nats2jetstream-config
+        name: nats2jetstream-config
+      - name: nats2jetstream--client-tls
+        projected:
+          defaultMode: 420
+          sources:
+          - secret:
+              name: nats2jetstream--client-tls

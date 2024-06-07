@@ -3,6 +3,7 @@ all: lib clippy test debug release
 
 .PHONY: clippy
 clippy:
+	make -C lib clippy
 	cargo clippy
 
 .PHONY: test

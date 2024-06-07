@@ -1,5 +1,12 @@
 ///
-/// Bla bla.. hardcoded stuff here.
+/// This matches log messages that are passed from journald/files
+/// through Grafana Alloy (or flow) and sets the following subject:
+///   bulk.{match}.{tenant}.{section}.{hostname}
+/// where hostname has the dots replaced with hyphens.
+///
+/// The NATS recipient has to ensure that these subject have valid
+/// listeners, otherwise waiting for an ack on publish will fail:
+///   error on publish(2) of subject <S>: timed out: didn't receive ack in time
 ///
 
 use nats2jetstream_json::payload_parser::BytesAttributes;
@@ -7,36 +14,41 @@ use nats2jetstream_json::payload_parser::BytesAttributes;
 
 #[derive(Debug)]
 pub struct Match {
-    pub subject: String,            // subject to use when publishing
+    pub subject: String,  // subject to use when publishing
 }
 
 
 impl Match {
     pub fn from_attributes(attrs: &BytesAttributes) -> Result<Match, &'static str> {
-
-        // {tenant}  .attributes.tenant <string>
-        // {section} .attributes.section <string>
-        // {timens}  .attributes.time_unix_nano <digits>
-        // {cluster} .attributes.cluster <string> (optional)
-        // {systemd_unit} .attributes.systemd_unit (optional)
-        // {host}    .attributes.host <string>
-        // {message} .message
-        // ({origin} = systemd_unit || filename (<- dots) || '{trans}.{syslog.fac}.{syslog.prio}.{syslog.tag}')
-        //                 ^- without dots, before first @
-
-        //    817  zabbix-agent.service
-        //    863  suricata.service
-        //   1249  /var/log/vault/audit.log
-        //   1681  unbound.service
-        //   2153  kernel:kern.warn:kernel
-        //   2244  /var/log/nginx/cust2/prd-access.log
-        //   4356  kernel:kern.info:kernel
-        //   5394  etcd.service
-        //   6253  rsyslog.service
-        //  10455  audit:auth.notice:audit
-        //  11239  /var/log/nginx/cust1/prod-access.log
-        //  16419  kube-apiserver.service
-        //  34451  haproxy
+        // TIPS:
+        //
+        // - for SYSLOG_FACILITY see:
+        //   https://github.com/ossobv/syslog2stdout/blob/ae5ca1ef277a8f4e5e652c0bf541be0dfed27a6a/syslog2stdout.c#L84-L121
+        //
+        // - We have these at our disposal:
+        //
+        //   {tenant}  .attributes.tenant <string>
+        //   {section} .attributes.section <string>
+        //   {timens}  .attributes.time_unix_nano <digits>
+        //   {cluster} .attributes.cluster <string> (optional)
+        //   {systemd_unit} .attributes.systemd_unit (optional)
+        //   {host}    .attributes.host <string>
+        //   {message} .message
+        //
+        // - Maybe we also want something like this:
+        //
+        //   {origin} =
+        //     systemd_unit (with everything after @ skipped) ||
+        //     filename ||
+        //     '{TRANSPORT}.{SYSLOG_FACILITY}[.{SYSLOG_PRIO}[.{SYSLOG_TAG}]]'
+        //
+        // TODO:
+        //
+        // - Below, there are substring matches like:
+        //   br#"\"_TRANSPORT\":\"syslog\""#
+        //   We could consider decoding the json instead. That would provide slower but more
+        //   accurate matching.
+        //
 
         let tenant = replace_dots_with_dashes(attrs.tenant);
         let section = replace_dots_with_dashes(attrs.section);
@@ -44,6 +56,7 @@ impl Match {
 
         // ==============================================================
         // One giant if here
+        // - somewhat sorted by occurrence (haproxy@ most common)
         // ==============================================================
 
         if starts_with(attrs.systemd_unit, b"haproxy@") {
@@ -192,9 +205,6 @@ impl Match {
         }
 
         if attrs.has_no_origin() {
-            // TODO: Do we want to decode .message here? Or just do
-            // substring matching like this:
-
             #[allow(clippy::collapsible_if)]
             if memmem(attrs.message, br#"\"_TRANSPORT\":\"kernel\""#).is_some() &&
                         memmem(attrs.message, br#"\"MESSAGE\":\"#).is_some() {
@@ -249,6 +259,7 @@ fn replace_dots_with_dashes(input: &[u8]) -> String {
 
     result
 }
+
 
 ///
 /// Check whether bytes starts with prefix.

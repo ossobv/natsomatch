@@ -153,6 +153,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
             };
             match dst_acker.await { // try acking the dest
                 Ok(_) => { src_acker.ack().await.unwrap(); /* ack the source; FIXME error handling */ },
+                // FIXME: When publish(2) fails, it might be because there is no stream and we
+                // cannot get an ack. Should we auto-create the stream?
                 Err(err) => { eprintln!("error on publish(2) of subject {}: {}", match_.subject, err); break; },
             }
             let pub_td = pub_t0.elapsed();
@@ -167,6 +169,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
             drop(period_stats);
         }
 
+        // FIXME: We get here at least on publish(2)-fail. Not sure
+        // when/if/how input.next().await can fail.
         eprintln!("FIXME: When do we get out of the iterator loop?");
 
         let forever_stats = forever_stats_io.lock().expect("Lock forever_stats_io fail");

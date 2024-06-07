@@ -1,6 +1,3 @@
-//use futures_util::stream::stream::StreamExt;
-//use futures_util::stream::stream::StreamExt;
-//use futures_util::stream::try_stream::TryStreamExt;
 use futures::StreamExt;
 
 use crate::config_parser;
@@ -53,7 +50,7 @@ impl Input {
     }
 
     pub async fn next(&mut self) -> Option<Result<async_nats::jetstream::Message, async_nats::error::Error<async_nats::jetstream::consumer::pull::MessagesErrorKind>>> {
-        // FIXME: What happens after we return None? Needs checken..
+        // FIXME: What happens after we return None? Needs checking..
         self.messages.next().await
     }
 }

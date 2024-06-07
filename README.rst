@@ -1,13 +1,14 @@
 nats2jetstream
 ==============
 
-Take messages from plain *NATS* subscription and feed them into a
-persistent *NATS JetStream*.
+Take *Grafana/Vector* passed log messages from *NATS JetStream*, match
+category and create new subjects.
 
 * Setup HOWTO:
 
-  - Make sure there is a JetStream stream to read from. If the data is
-    published without a JetStream, create one automatically::
+  - Make sure there is a JetStream stream to read from. Creating a
+    stream with a subjects set to the Vector subject will make it
+    collect the published message automatically::
 
       nats stream add --subjects=default.nats.vector \
         --description='All messages from vector' \
@@ -15,68 +16,48 @@ persistent *NATS JetStream*.
         --retention=limits --discard=old --max-bytes=20GiB --max-msgs=-1 \
         --max-msgs-per-subject=-1 --max-age=-1 --max-msg-size=-1 \
         --dupe-window=60s --no-allow-rollup --no-deny-delete \
-        --no-deny-purge --allow-direct bulk_by_section
+        --no-deny-purge --allow-direct bulk_unfiltered
 
-  - Skip the rest below. We don't need to do anything. The above line already
-    takes care of the original goal of this project.
-
-  - Next, we need a project that does filtering and rewriting into
-    different streams/subjects.
-
-  - Create a consumer, manually::
+  - Create a consumer which we'll use to read from::
 
       nats consumer add --pull --deliver=all --ack=explicit \
         --replay=instant --filter= --max-deliver=-1 --max-pending=0 \
         --no-headers-only --backoff=none \
         bulk_unfiltered bulk_unfiltered_consumer
 
-* Various subjects may have been configured in lib/src/log_matcher.rs. We'll
-  need to create streams for those::
+  - Create a bunch of streams to write to, one for every possible
+    matched subject. Also create a consumer for test purposes while
+    we're at it::
 
-    for tp in execve haproxy nginx k8s unknown; do
-        nats stream add --subjects="bulk.$tp.>" --description="Bulk $tp" \
+      MATCHES=$(cat lib/match/src/log_matcher.rs |
+                grep -FA2 'Ok(Match' |
+                sed -e '/subject: /!d;s/.*format!("bulk[.]//;s/[.].*//' |
+                sort)
+
+      for match in $MATCHES; do
+
+        nats stream add --subjects="bulk.$tp.>" --description="Bulk $match" \
           --storage=file --replicas=3 --retention=limits --discard=old \
           --max-bytes=2GiB --max-msgs=-1 --max-msgs-per-subject=-1 \
           --max-age=-1 --max-msg-size=-1 --dupe-window=60s --no-allow-rollup \
-          --no-deny-delete --no-deny-purge --allow-direct bulk_match_$tp
-    done
+          --no-deny-delete --no-deny-purge --allow-direct "bulk_match_${match}"
 
+        nats consumer add --pull --deliver=all --ack=explicit \
+          --replay=instant --filter= --max-deliver=-1 --max-pending=0 \
+          --no-headers-only --backoff=none \
+          "bulk_match_${match}" "bulk_match_${match}_consumer"
 
-----
-TODO
-----
+      done
 
-☐  Rename project from nats2jetstream to nats-o-match.
+* Next, we'll need a couple of these running. Could be more or less
+  depending on how fast consumption rates are. In ``doc/`` there's a
+  *Kubernetes* setup.
 
-☐  Hardcoded attributes are now in lib/json/src/payload_parser.rs. Maybe make them configurable.
+* Configuration can be seen below. If you're using *Kubernetes*,
+  configure it in the *ConfigMap*.
 
-☐  Hardcoded matching rules are now in lib/match/src/log_matcher.rs. Maybe make them configurable.
-
-☐  Explain setup:
-
-- one or more pods
-- configuration as toml seen below
-- manual Sink setup using nats cli ...
-- explain that tls.server_name is not working right now
-- explain how to check healthz and on which port it's listening
-
-☐  Log startup.
-
-☐  Log shutdown.
-
-☐  See if we can add filters to remove useless messages. We'll want to check some live data here.
-
-☐  Add configurable bind address for /healthz server. Use a ping/pong test on input/sink too?
-
-☐  See if we want to rely on ghcr.io/rust-cross/rust-musl-cross ( https://github.com/rust-cross/rust-musl-cross ) or want to build something from the official images.
-
-☐  Small stuff:
-
-- Also count average message length.
-
-☐  Check and fix behaviour on NATS/subscription disconnect/error.
-
-☐  Check and fix behaviour on NATS/JetStream disconnect/error.
+* The ``/healthz`` health check and stats reporting is listening on port 3000.
+  The *Kubernetes* container uses this to check liveness.
 
 
 -------------------
@@ -111,6 +92,38 @@ Configuration for the Rust version:
     #tls.key_file = './nats_client.key'
     # No need to set jetstream name or subjects. The subject generation is
     # hardcoded for now, based on the message.
+
+
+----
+TODO
+----
+
+☐  Rename project from nats2jetstream to nats-o-match.
+
+☐  Clear (greppable) log message on startup. Clear log message on shutdown.
+
+☐  Hardcoded attributes are now in lib/json/src/payload_parser.rs. Maybe make them configurable.
+
+☐  Hardcoded matching rules are now in lib/match/src/log_matcher.rs. Maybe make them configurable.
+
+☐  See if we can add filters to remove useless messages. We'll want to check some live data here.
+
+☐  Add configurable bind address for /healthz server. Use a ping/pong test on input/sink too?
+
+☐  See if we want to rely on ghcr.io/rust-cross/rust-musl-cross ( https://github.com/rust-cross/rust-musl-cross ) or want to build something from the official images.
+
+☐  See if we want to use cargo-chef for docker layer caching (speeding up release builds).
+
+☐  Stats improvements:
+
+- Count average message length.
+- Report stats on output subscriptions (streams) so we can reorder filters for more speed.
+
+☐  Monitoring improvements:
+
+- Right now we have no easy detection of streams that are not handled quickly enough. Maybe check bulk_unfiltered_consumer for "unprocessed" counts.
+
+☐  Check and fix behaviour on NATS/JetStream disconnect/error. Consider auto-creating streams. (Where are the settings?)
 
 
 -----------------------

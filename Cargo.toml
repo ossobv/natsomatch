@@ -20,7 +20,7 @@ panic = "abort"    # No debug stacktrace awesomeness?
 version-from-env = []
 
 [[bench]]
-name = "nats_utils"
+name = "bogus"
 harness = false
 
 #[[bin]]
