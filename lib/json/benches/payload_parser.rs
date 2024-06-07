@@ -1,6 +1,6 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
-use nats2jetstream_json::payload_parser;
+use natsomatch_json::payload_parser;
 
 
 fn criterion_benchmark(c: &mut Criterion) {

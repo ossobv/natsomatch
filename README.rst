@@ -1,5 +1,5 @@
-nats2jetstream
-==============
+natsomatch (NATS o' Match)
+==========================
 
 Take *Grafana/Vector* passed log messages from *NATS JetStream*, match
 category and create new subjects.
@@ -98,7 +98,7 @@ Configuration for the Rust version:
 TODO
 ----
 
-☐  Rename project from nats2jetstream to nats-o-match.
+☐  Rename project from natsomatch to nats-o-match.
 
 ☐  Clear (greppable) log message on startup. Clear log message on shutdown.
 
@@ -134,16 +134,16 @@ The ``git describe`` version is stored and shown on bad arguments:
 
 .. code-block:: console
 
-    $ ./target/release/nats2jetstream -v
-    nats2jetstream v0.1.0
-    Usage: ./target/release/nats2jetstream -c <config-file>
+    $ ./target/release/natsomatch -v
+    natsomatch v0.1.0
+    Usage: ./target/release/natsomatch -c <config-file>
 
 The built binary (if built using ``cargo auditable build``) includes a
 *Software Bill of Materials* (SBOM):
 
 .. code-block:: console
 
-    $ objcopy --dump-section .dep-v0=/dev/stdout target/release/nats2jetstream |
+    $ objcopy --dump-section .dep-v0=/dev/stdout target/release/natsomatch |
         python3 -c 'import zlib,sys;print(zlib.decompress(sys.stdin.buffer.read()).decode("utf-8"))' |
         jq .
     {

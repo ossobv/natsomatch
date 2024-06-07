@@ -16,7 +16,7 @@ impl Sink {
         let srv = &sink.natsconfig;
 
         println!("Connecting to NATS (sink) {} ...", srv.server);
-        let nc_out = misc_nats::connect("nats2jetstream-rs-jetstream-sink", &srv.server, &srv.tls, &srv.auth).await?;
+        let nc_out = misc_nats::connect("natsomatch-rs-jetstream-sink", &srv.server, &srv.tls, &srv.auth).await?;
         let js = async_nats::jetstream::new(nc_out);
         println!("Connected to NATS (sink) with JetStream context {:?}", js);
 

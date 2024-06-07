@@ -22,7 +22,7 @@ impl Input {
         let srv = &input.natsconfig;
 
         println!("Connecting to NATS (input) {} -> {} -> {}...", srv.server, input.stream, input.consumer);
-        let nc_in = misc_nats::connect("nats2jetstream-rs-nats-input", &srv.server, &srv.tls, &srv.auth).await?;
+        let nc_in = misc_nats::connect("natsomatch-rs-nats-input", &srv.server, &srv.tls, &srv.auth).await?;
 
         let js = async_nats::jetstream::new(nc_in);
         println!("Connected to NATS+JS (input) with context {:?}", js);

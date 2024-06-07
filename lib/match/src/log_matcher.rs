@@ -9,7 +9,7 @@
 ///   error on publish(2) of subject <S>: timed out: didn't receive ack in time
 ///
 
-use nats2jetstream_json::payload_parser::BytesAttributes;
+use natsomatch_json::payload_parser::BytesAttributes;
 
 
 #[derive(Debug)]
@@ -394,7 +394,7 @@ pub mod samples {
     ,"observed_time_unix_nano":1717080624340039502,"section":"secret"
     ,"tenant":"important","time_unix_nano":1717080624000032000}
     ,"dropped_attributes_count":0
-    ,"message":"{\"MESSAGE\":\"{\\\"action\\\":\\\"workon\\\",\\\"user\\\":\\\"johndoe\\\",\\\"ticket\\\":\\\"https://remote-url/issues/69\\\",\\\"description\\\":\\\"nats2jetstream-work\\\"}\",\"PRIORITY\":\"4\",\"SYSLOG_FACILITY\":\"10\",\"SYSLOG_IDENTIFIER\":\"osso-change\",\"SYSLOG_TIMESTAMP\":\"May 30 16:50:23 \",\"_BOOT_ID\":\"0f7\",\"_COMM\":\"logger\",\"_GID\":\"1005\",\"_HOSTNAME\":\"some.server\",\"_MACHINE_ID\":\"fd4\",\"_PID\":\"105815\",\"_SOURCE_REALTIME_TIMESTAMP\":\"1717080624000014\",\"_TRANSPORT\":\"syslog\",\"_UID\":\"1005\"}"
+    ,"message":"{\"MESSAGE\":\"{\\\"action\\\":\\\"workon\\\",\\\"user\\\":\\\"johndoe\\\",\\\"ticket\\\":\\\"https://remote-url/issues/69\\\",\\\"description\\\":\\\"natsomatch-work\\\"}\",\"PRIORITY\":\"4\",\"SYSLOG_FACILITY\":\"10\",\"SYSLOG_IDENTIFIER\":\"osso-change\",\"SYSLOG_TIMESTAMP\":\"May 30 16:50:23 \",\"_BOOT_ID\":\"0f7\",\"_COMM\":\"logger\",\"_GID\":\"1005\",\"_HOSTNAME\":\"some.server\",\"_MACHINE_ID\":\"fd4\",\"_PID\":\"105815\",\"_SOURCE_REALTIME_TIMESTAMP\":\"1717080624000014\",\"_TRANSPORT\":\"syslog\",\"_UID\":\"1005\"}"
     ,"observed_timestamp":"2024-05-30T14:50:24.340039502Z"
     ,"source_type":"opentelemetry","timestamp":"2024-05-30T14:50:24.000032Z"}
     "#;

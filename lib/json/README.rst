@@ -1,4 +1,4 @@
-nats2jetstream-json
+natsomatch-json
 ===================
 
 Quicker parsing of JSON which we know to have a specific format.

@@ -1,9 +1,9 @@
 #cargo-features = ["edition2024"]
 
 [package]
-name = "nats2jetstream"
+name = "natsomatch"
 edition = "2021"
-version = "0.1.3"
+version = "0.2.0"
 #authors = ["Alice <a@example.com>", "Bob <b@example.com>"]
 
 # https://github.com/johnthagen/min-sized-rust
@@ -12,9 +12,9 @@ version = "0.1.3"
 [profile.release]
 strip = true        # Automatically strip symbols from the binary
 #opt-level = "z"    # Optimize for size?
-#DISABLED_FOR_FASTER_BUILD#lto = true    # Enable Link Time Optimization (LTO)
-#DISABLED_FOR_FASTER_BUILD#codegen-units = 1   # Serial build. Slow, but better opt
-panic = "abort"    # No debug stacktrace awesomeness?
+#DISABLED_FOR_FASTER_BUILD#lto = true           # Enable Link Time Optimization (LTO)
+#DISABLED_FOR_FASTER_BUILD#codegen-units = 1    # Serial build. Slow, but better opt
+#panic = "abort"    # No debug stacktrace awesomeness?
 
 [features]
 version-from-env = []
@@ -23,17 +23,12 @@ version-from-env = []
 name = "bogus"
 harness = false
 
-#[[bin]]
-#name = "nats2jetstream"
-#path = "main.rs"
-#target = "src/main.rs"
-
 [dev-dependencies]
 criterion = "0.5"
 
 [dependencies]
-nats2jetstream-json = { path = "lib/json" }
-nats2jetstream-match = { path = "lib/match" }
+natsomatch-json = { path = "lib/json" }
+natsomatch-match = { path = "lib/match" }
 
 async-nats = "0.33"
 bytes = "1"

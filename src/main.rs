@@ -10,8 +10,8 @@ use hyper_util::rt::TokioIo;
 use tokio::net::TcpListener;
 use tokio::time::sleep;
 
-use nats2jetstream_json::payload_parser;
-use nats2jetstream_match::log_matcher;
+use natsomatch_json::payload_parser;
+use natsomatch_match::log_matcher;
 
 // Either here or in lib.. depending on whether this is a lib or an app.
 mod config_parser;
@@ -61,7 +61,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // Collect command-line arguments
     let args: Vec<String> = env::args().collect();
     if args.len() != 3 || args[1] != "-c" {
-        eprintln!("nats2jetstream {}", GIT_VERSION);
+        eprintln!("natsomatch {}", GIT_VERSION);
         eprintln!("Usage: {} -c <config-file>", args[0]);
         std::process::exit(1);
     }
@@ -181,7 +181,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }
 
     }
-    eprintln!("nats2jetstream shutting down...");
+    eprintln!("natsomatch shutting down...");
 
     // XXX: does these work? is this needed?
     healthz_task.abort();

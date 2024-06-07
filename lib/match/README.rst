@@ -1,4 +1,4 @@
-nats2jetstream-match
+natsomatch-match
 ====================
 
 Hardcoded matching rules until we want to create those dynamically.

@@ -1,7 +1,7 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
-use nats2jetstream_json::payload_parser::BytesAttributes;
-use nats2jetstream_match::log_matcher::{Match, samples};
+use natsomatch_json::payload_parser::BytesAttributes;
+use natsomatch_match::log_matcher::{Match, samples};
 
 
 fn criterion_benchmark(c: &mut Criterion) {
