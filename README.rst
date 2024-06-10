@@ -98,8 +98,6 @@ Configuration for the Rust version:
 TODO
 ----
 
-☐  Rename project from natsomatch to nats-o-match.
-
 ☐  Clear (greppable) log message on startup. Clear log message on shutdown.
 
 ☐  Hardcoded attributes are now in lib/json/src/payload_parser.rs. Maybe make them configurable.
