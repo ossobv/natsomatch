@@ -326,6 +326,30 @@ pub mod samples {
     ,"source_type":"opentelemetry,"timestamp":"2024-05-28T16:58:54.575273Z"}
     "#;
 
+    pub static HIDS: &[u8] = br#"
+    {"attributes":{"host":"H"
+    ,"job":"loki.source.journal.logs_journald_generic"
+    ,"loki.attribute.labels":"job,systemd_unit"
+    ,"observed_time_unix_nano":1716915534776220907,"section":"S"
+    ,"systemd_unit":"clamav-clamonacc.service","tenant":"T"
+    ,"time_unix_nano":1716915534575273000},"dropped_attributes_count":0
+    ,"message":"{\"_SYSTEMD_UNIT\":\"clamav-clamonacc.service\",\"_SYSTEMD_CGROUP\":\"/system.slice/clamav-clamonacc.service\",\"_EXE\":\"/usr/sbin/clamonacc\",\"_PID\":\"3976\",\"_STREAM_ID\":\"d81\",\"_TRANSPORT\":\"stdout\",\"PRIORITY\":\"6\",\"SYSLOG_FACILITY\":\"3\",\"__MONOTONIC_TIMESTAMP\":\"338688292779\",\"_CMDLINE\":\"/usr/sbin/clamonacc --fdpass -F --config-file=/etc/clamav/clamd.conf --log=/var/log/clamav/clamonacc.log\",\"_SYSTEMD_INVOCATION_ID\":\"d87\",\"_UID\":\"0\",\"_CAP_EFFECTIVE\":\"1ffffffffff\",\"__CURSOR\":\"s=9efbf583db084dcc8c596b9371f3c0b1;i=57afb56;b=635fd37f21094113ac0b060a100b941a;m=4edb6537ab;t=61ba690b76907;x=6e7b5f335ef0850f\",\"_GID\":\"0\",\"_SELINUX_CONTEXT\":\"unconfined\n\",\"_SYSTEMD_SLICE\":\"system.slice\",\"_MACHINE_ID\":\"172\",\"MESSAGE\":\"/home/johnq/index.html?wpdmdl=8847&refresh=6679b42a713d71719252010: Win.Test.EICAR_HDB-1 FOUND\",\"_COMM\":\"clamonacc\",\"_BOOT_ID\":\"635\",\"_HOSTNAME\":\"H\",\"SYSLOG_IDENTIFIER\":\"clamonacc\",\"__REALTIME_TIMESTAMP\":\"1719252066724103\"}"
+    ,"observed_timestamp":"2024-05-28T16:58:54.776220907Z"
+    ,"source_type":"opentelemetry,"timestamp":"2024-05-28T16:58:54.575273Z"}
+    "#;
+
+    pub static HIDS2: &[u8] = br#"
+    {"attributes":{"host":"H"
+    ,"job":"loki.source.journal.logs_journald_generic"
+    ,"loki.attribute.labels":"job,systemd_unit"
+    ,"observed_time_unix_nano":1716915534776220907,"section":"S"
+    ,"systemd_unit":"clamav-clamonacc.service","tenant":"T"
+    ,"time_unix_nano":1716915534575273000},"dropped_attributes_count":0
+    ,"message":"{\"_CAP_EFFECTIVE\":\"0\",\"_TRANSPORT\":\"stdout\",\"_EXE\":\"/usr/sbin/clamd\",\"__CURSOR\":\"s=9efbf583db084dcc8c596b9371f3c0b1;i=57afb55;b=635fd37f21094113ac0b060a100b941a;m=4edb65366f;t=61ba690b767cb;x=aed0ba22894a4d42\",\"_SYSTEMD_CGROUP\":\"/system.slice/clamav-daemon.service\",\"SYSLOG_FACILITY\":\"3\",\"PRIORITY\":\"6\",\"_MACHINE_ID\":\"172\",\"_STREAM_ID\":\"4d6\",\"_HOSTNAME\":\"H\",\"_SELINUX_CONTEXT\":\"/usr/sbin/clamd (enforce)\n\",\"__MONOTONIC_TIMESTAMP\":\"338688292463\",\"_COMM\":\"clamd\",\"SYSLOG_IDENTIFIER\":\"clamd\",\"_SYSTEMD_UNIT\":\"clamav-daemon.service\",\"_BOOT_ID\":\"635\",\"__REALTIME_TIMESTAMP\":\"1719252066723787\",\"MESSAGE\":\"Mon Jun 24 20:01:06 2024 -> /home/johnq/index.html?wpdmdl=8847&refresh=6679b42a713d71719252010: Win.Test.EICAR_HDB-1(6ce6f415d8475545be5ba114f208b0ff:184) FOUND\",\"_SYSTEMD_SLICE\":\"system.slice\",\"_SYSTEMD_INVOCATION_ID\":\"b1a\",\"_UID\":\"110\",\"_GID\":\"118\",\"_PID\":\"757\",\"_CMDLINE\":\"/usr/sbin/clamd --foreground=true\"}"
+    ,"observed_timestamp":"2024-05-28T16:58:54.776220907Z"
+    ,"source_type":"opentelemetry,"timestamp":"2024-05-28T16:58:54.575273Z"}
+    "#;
+
     pub static K8S: &[u8] = br#"
     {"attributes":{"cluster":"k8s-starwars","host":"master.sith.starwars"
     ,"job":"loki.source.journal.logs_journald_generic"
@@ -441,7 +465,7 @@ pub mod samples {
     ,"observed_time_unix_nano":1717672932205211587,"section":"S"
     ,"systemd_unit":"xinetd.service","tenant":"T"
     ,"time_unix_nano":1717672931869246000},"dropped_attributes_count":0
-    ,"message":"{\"MESSAGE\":\"(to postgres) root on none\",\"PRIORITY\":\"5\",\"SYSLOG_FACILITY\":\"4\",\"SYSLOG_IDENTIFIER\":\"su\",\"SYSLOG_TIMESTAMP\":\"Jun  6 13:22:11 \",\"_BOOT_ID\":\"a306852d10b9415f9943f1aaf98d8639\",\"_CAP_EFFECTIVE\":\"3fffffffff\",\"_CMDLINE\":\"su postgres -c /usr/local/bin/repmgr_node_status.py node_id\",\"_COMM\":\"su\",\"_EXE\":\"/usr/bin/su\",\"_GID\":\"0\",\"_HOSTNAME\":\"H\",\"_MACHINE_ID\":\"aa0f9eaf5444475bbecb71f8ddbae29c\",\"_PID\":\"2832697\",\"_SELINUX_CONTEXT\":\"unconfined\\n\",\"_SOURCE_REALTIME_TIMESTAMP\":\"1717672931869164\",\"_SYSTEMD_CGROUP\":\"/system.slice/xinetd.service\",\"_SYSTEMD_INVOCATION_ID\":\"2f36eef054ab40ac9aedf684dfd32491\",\"_SYSTEMD_SLICE\":\"system.slice\",\"_SYSTEMD_UNIT\":\"xinetd.service\",\"_TRANSPORT\":\"syslog\",\"_UID\":\"0\"}"
+    ,"message":"{\"MESSAGE\":\"(to postgres) root on none\",\"PRIORITY\":\"5\",\"SYSLOG_FACILITY\":\"4\",\"SYSLOG_IDENTIFIER\":\"su\",\"SYSLOG_TIMESTAMP\":\"Jun  6 13:22:11 \",\"_BOOT_ID\":\"a30\",\"_CAP_EFFECTIVE\":\"3fffffffff\",\"_CMDLINE\":\"su postgres -c /usr/local/bin/repmgr_node_status.py node_id\",\"_COMM\":\"su\",\"_EXE\":\"/usr/bin/su\",\"_GID\":\"0\",\"_HOSTNAME\":\"H\",\"_MACHINE_ID\":\"aa0\",\"_PID\":\"2832697\",\"_SELINUX_CONTEXT\":\"unconfined\\n\",\"_SOURCE_REALTIME_TIMESTAMP\":\"1717672931869164\",\"_SYSTEMD_CGROUP\":\"/system.slice/xinetd.service\",\"_SYSTEMD_INVOCATION_ID\":\"2f3\",\"_SYSTEMD_SLICE\":\"system.slice\",\"_SYSTEMD_UNIT\":\"xinetd.service\",\"_TRANSPORT\":\"syslog\",\"_UID\":\"0\"}"
     ,"observed_timestamp":"2024-06-06T11:22:12.205211587Z"
     ,"source_type":"opentelemetry","timestamp":"2024-06-06T11:22:11.869246Z"}
     "#;
@@ -601,10 +625,12 @@ mod tests {
 
     #[test]
     fn test_match_hids() {
-        let payloads: [&[u8]; 3] = [
+        let payloads: [&[u8]; 5] = [
             br#"{"attributes":{"systemd_unit":"clamav-daemon.service","host":"H","tenant":"T","section":"S"},"message":"M"}"#,
             br#"{"attributes":{"systemd_unit":"clamav-freshclam.service","host":"H","tenant":"T","section":"S"},"message":"M"}"#,
             br#"{"attributes":{"systemd_unit":"tetragon.service","host":"H","tenant":"T","section":"S"},"message":"M"}"#,
+            samples::HIDS,
+            samples::HIDS2,
         ];
         for payload in &payloads {
             let attrs = BytesAttributes::from_payload(payload).expect("parse error");
