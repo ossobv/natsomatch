@@ -46,8 +46,8 @@ impl Match {
         //
         // - Below, there are substring matches like:
         //   br#"\"_TRANSPORT\":\"syslog\""#
-        //   We could consider decoding the json instead. That would provide slower but more
-        //   accurate matching.
+        //   We could consider decoding the json instead. That would
+        //   provide slower but more accurate matching.
         //
 
         let tenant = replace_dots_with_dashes(attrs.tenant);
@@ -75,8 +75,7 @@ impl Match {
 
         #[allow(clippy::collapsible_if)]
         if memmem(attrs.message, br#"\"_TRANSPORT\":\"syslog\""#).is_some() {
-            if memmem(attrs.message, br#"\"_AUDIT_SESSION\":\""#).is_some() ||
-                    memmem(attrs.message, br#"\"MESSAGE\":\"pam_unix("#).is_some() ||
+            if memmem(attrs.message, br#"\"MESSAGE\":\"pam_unix("#).is_some() ||
                     (attrs.systemd_unit == b"xinetd.service" &&
                      memmem(attrs.message, br#"\"SYSLOG_FACILITY\":\"4\""#).is_some()) ||
                     (attrs.systemd_unit == b"zabbix-agent.service" &&
@@ -123,11 +122,11 @@ impl Match {
 
         if (starts_with(attrs.systemd_unit, b"systemd-") &&
                 ends_with(attrs.systemd_unit, b".service")) ||
-                (starts_with(attrs.systemd_unit, b"session-") &&
-                 ends_with(attrs.systemd_unit, b".scope")) ||
                 (starts_with(attrs.systemd_unit, b"user@") &&
-                 ends_with(attrs.systemd_unit, b".service")) ||
-                attrs.systemd_unit == b"init.scope" {
+                 ends_with(attrs.systemd_unit, b".service")) {
+            // There are also "init.scope" and "session-xxx.scope", but
+            // they have _TRANSPORT=syslog and
+            // SYSLOG_IDENTIFIER=systemd. They are handled below.
             return Ok(Match {
                 // destination: "bulk_match_systemd",
                 subject: format!("bulk.systemd.{tenant}.{section}.{hostname}"),
@@ -204,7 +203,7 @@ impl Match {
             });
         }
 
-        if attrs.has_no_origin() {
+        if attrs.has_no_origin() || ends_with(attrs.systemd_unit, b".scope") {
             #[allow(clippy::collapsible_if)]
             if memmem(attrs.message, br#"\"_TRANSPORT\":\"kernel\""#).is_some() &&
                         memmem(attrs.message, br#"\"MESSAGE\":\"#).is_some() {
@@ -224,12 +223,37 @@ impl Match {
                 });
             }
 
-            if memmem(attrs.message, br#"\"SYSLOG_IDENTIFIER\":\"osso-change\""#).is_some() {
-                return Ok(Match {
-                    // destination: "bulk_match_execve",
-                    subject: format!("bulk.execve.{tenant}.{section}.{hostname}"),
-                });
+            if memmem(attrs.message, br#"\"_TRANSPORT\":\"syslog\""#).is_some() {
+                if memmem(attrs.message, br#"\"SYSLOG_IDENTIFIER\":\"systemd\""#).is_some() {
+                    return Ok(Match {
+                        // destination: "bulk_match_systemd",
+                        subject: format!("bulk.systemd.{tenant}.{section}.{hostname}"),
+                    });
+                }
+                if memmem(attrs.message, br#"\"SYSLOG_IDENTIFIER\":\"sshd\""#).is_some() {
+                    return Ok(Match {
+                        // destination: "bulk_match_ssh",
+                        subject: format!("bulk.ssh.{tenant}.{section}.{hostname}"),
+                    });
+                }
+                if memmem(attrs.message, br#"\"SYSLOG_IDENTIFIER\":\"osso-change\""#).is_some() {
+                    return Ok(Match {
+                        // destination: "bulk_match_execve",
+                        subject: format!("bulk.execve.{tenant}.{section}.{hostname}"),
+                    });
+                }
             }
+        }
+
+        // Lastly. Although this is probably picked up above with
+        // SYSLOG_IDENTIFIER=systemd.
+        if (starts_with(attrs.systemd_unit, b"session-") &&
+            ends_with(attrs.systemd_unit, b".scope")) ||
+                 attrs.systemd_unit == b"init.scope" {
+            return Ok(Match {
+                // destination: "bulk_match_systemd",
+                subject: format!("bulk.systemd.{tenant}.{section}.{hostname}"),
+            });
         }
 
         Ok(Match {
@@ -423,6 +447,45 @@ pub mod samples {
     ,"source_type":"opentelemetry","timestamp":"2024-05-30T14:50:24.000032Z"}
     "#;
 
+    pub static OSSO_CHANGE_ALTHOUGH_SCOPE: &[u8] = br#"
+    {"attributes":{"host":"some.server"
+    ,"job":"loki.source.journal.logs_journald_generic"
+    ,"loki.attribute.labels":"systemd_unit,job"
+    ,"observed_time_unix_nano":1717080624340039502,"section":"secret"
+    ,"systemd_unit":"session-1851794.scope","tenant":"important"
+    ,"time_unix_nano":1717080624000032000}
+    ,"dropped_attributes_count":0
+    ,"message":"{\"SYSLOG_FACILITY\":\"10\",\"_GID\":\"1234\",\"_CAP_EFFECTIVE\":\"0\",\"_UID\":\"1234\",\"_MACHINE_ID\":\"599\",\"_SYSTEMD_CGROUP\":\"/user.slice/user-1234.slice/session-1851794.scope\",\"_PID\":\"2762280\",\"_COMM\":\"logger\",\"_TRANSPORT\":\"syslog\",\"_AUDIT_SESSION\":\"1851794\",\"_SYSTEMD_UNIT\":\"session-1851794.scope\",\"_SYSTEMD_SESSION\":\"1851794\",\"_SOURCE_REALTIME_TIMESTAMP\":\"1719471918818348\",\"__MONOTONIC_TIMESTAMP\":\"20797649240313\",\"PRIORITY\":\"4\",\"_SYSTEMD_USER_SLICE\":\"-.slice\",\"_HOSTNAME\":\"some.server\",\"_SYSTEMD_SLICE\":\"user-1234.slice\",\"_BOOT_ID\":\"7d0\",\"_AUDIT_LOGINUID\":\"1234\",\"SYSLOG_TIMESTAMP\":\"Jun 27 09:05:18 \",\"_SYSTEMD_INVOCATION_ID\":\"255\",\"__CURSOR\":\"s=30689a72abbc4412817ecd2b289c3ad0;i=43ee390;b=7d030e2673b447b4a5364034835413c0;m=12ea547ec0f9;t=61bd9c0ec2458;x=202154d2dab6add5\",\"MESSAGE\":\"{\\\"action\\\":\\\"workon\\\",\\\"user\\\":\\\"johnq\\\",\\\"ticket\\\":\\\"TICKET_URL/69\\\",\\\"description\\\":\\\"check-sysobj-log-reasons\\\"}\",\"_SELINUX_CONTEXT\":\"unconfined\\n\",\"SYSLOG_IDENTIFIER\":\"osso-change\",\"__REALTIME_TIMESTAMP\":\"1719471918818392\",\"_SYSTEMD_OWNER_UID\":\"1234\"}"
+    ,"observed_timestamp":"2024-05-30T14:50:24.340039502Z"
+    ,"source_type":"opentelemetry","timestamp":"2024-05-30T14:50:24.000032Z"}
+    "#;
+
+    pub static SSH_ALTHOUGH_SCOPE: &[u8] = br#"
+    {"attributes":{"host":"H"
+    ,"job":"loki.source.journal.logs_journald_generic"
+    ,"loki.attribute.labels":"systemd_unit,job"
+    ,"observed_time_unix_nano":1717080624340039502,"section":"S"
+    ,"systemd_unit":"session-1851794.scope","tenant":"T"
+    ,"time_unix_nano":1717080624000032000}
+    ,"dropped_attributes_count":0
+    ,"message":"{\"_HOSTNAME\":\"H\",\"__CURSOR\":\"s=30689a72abbc4412817ecd2b289c3ad0;i=43eed1c;b=7d030e2673b447b4a5364034835413c0;m=12ea90810543;t=61bd9fcee68a2;x=e2bdcbdb346ff5c9\",\"_SELINUX_CONTEXT\":\"unconfined\\n\",\"_BOOT_ID\":\"7d0\",\"_GID\":\"1234\",\"_SYSTEMD_OWNER_UID\":\"1234\",\"_SOURCE_REALTIME_TIMESTAMP\":\"1719472925594862\",\"_SYSTEMD_SLICE\":\"user-1234.slice\",\"_CAP_EFFECTIVE\":\"0\",\"_SYSTEMD_UNIT\":\"session-1851794.scope\",\"SYSLOG_FACILITY\":\"4\",\"SYSLOG_IDENTIFIER\":\"sshd\",\"_PID\":\"2762162\",\"_SYSTEMD_SESSION\":\"1851794\",\"_SYSTEMD_USER_SLICE\":\"-.slice\",\"SYSLOG_TIMESTAMP\":\"Jun 27 09:22:05 \",\"_UID\":\"1234\",\"SYSLOG_PID\":\"2762162\",\"_AUDIT_SESSION\":\"1851794\",\"_COMM\":\"sshd\",\"_AUDIT_LOGINUID\":\"1234\",\"MESSAGE\":\"Disconnected from user johnq 10.20.30.40 port 41612\",\"__REALTIME_TIMESTAMP\":\"1719472925599906\",\"_SYSTEMD_CGROUP\":\"/user.slice/user-1234.slice/session-1851794.scope\",\"_MACHINE_ID\":\"599\",\"__MONOTONIC_TIMESTAMP\":\"20798656021827\",\"_SYSTEMD_INVOCATION_ID\":\"255\",\"_TRANSPORT\":\"syslog\",\"PRIORITY\":\"6\"}"
+    ,"observed_timestamp":"2024-05-30T14:50:24.340039502Z"
+    ,"source_type":"opentelemetry","timestamp":"2024-05-30T14:50:24.000032Z"}
+    "#;
+
+    pub static SSH_SERVICE: &[u8] = br#"
+    {"attributes":{"host":"H"
+    ,"job":"loki.source.journal.logs_journald_generic"
+    ,"loki.attribute.labels":"systemd_unit,job"
+    ,"observed_time_unix_nano":1717080624340039502,"section":"S"
+    ,"systemd_unit":"ssh.service","tenant":"T"
+    ,"time_unix_nano":1717080624000032000}
+    ,"dropped_attributes_count":0
+    ,"message":"{\"_EXE\":\"/usr/sbin/sshd\",\"_HOSTNAME\":\"H\",\"_SELINUX_CONTEXT\":\"unconfined\\n\",\"_BOOT_ID\":\"7d0\",\"_SOURCE_REALTIME_TIMESTAMP\":\"1719471900621313\",\"_UID\":\"0\",\"SYSLOG_FACILITY\":\"4\",\"__REALTIME_TIMESTAMP\":\"1719471900621895\",\"_SYSTEMD_INVOCATION_ID\":\"e1b\",\"PRIORITY\":\"6\",\"_GID\":\"0\",\"_COMM\":\"sshd\",\"SYSLOG_TIMESTAMP\":\"Jun 27 09:05:00 \",\"_CAP_EFFECTIVE\":\"1ffffffffff\",\"_SYSTEMD_CGROUP\":\"/system.slice/ssh.service\",\"_MACHINE_ID\":\"599\",\"_TRANSPORT\":\"syslog\",\"_CMDLINE\":\"\\\"sshd: johnq [priv]\\\"\",\"_SYSTEMD_SLICE\":\"system.slice\",\"SYSLOG_IDENTIFIER\":\"sshd\",\"_PID\":\"2762111\",\"SYSLOG_PID\":\"2762111\",\"MESSAGE\":\"Accepted publickey for johnq from 10.20.30.40 port 41612 ssh2: ED25519 SHA256:CAB...\",\"__CURSOR\":\"s=03a3549774db4c44a00fafd4fa8a1afa;i=43ee2c9;b=7d030e2673b447b4a5364034835413c0;m=12ea536918e8;t=61bd9bfd67c47;x=efdb43ee27f4faec\",\"__MONOTONIC_TIMESTAMP\":\"20797631043816\",\"_SYSTEMD_UNIT\":\"ssh.service\"}"
+    ,"observed_timestamp":"2024-05-30T14:50:24.340039502Z"
+    ,"source_type":"opentelemetry","timestamp":"2024-05-30T14:50:24.000032Z"}
+    "#;
+
     pub static SYSLOG_AUDIT: &[u8] = br#"
     {"attributes":{"host":"lb.example.com"
     ,"job":"loki.source.journal.logs_journald_generic"
@@ -445,6 +508,22 @@ pub mod samples {
     ,"message":"{\"MESSAGE\":\"pam_unix(sudo:session): session closed for user root\",\"PRIORITY\":\"6\",\"SYSLOG_FACILITY\":\"10\",\"SYSLOG_IDENTIFIER\":\"sudo\",\"SYSLOG_TIMESTAMP\":\"Jun  5 15:34:00 \",\"_BOOT_ID\":\"f9b\",\"_CAP_EFFECTIVE\":\"3fffffffff\",\"_CMDLINE\":\"sudo iptables -S FORWARD -w\",\"_COMM\":\"sudo\",\"_EXE\":\"/usr/bin/sudo\",\"_GID\":\"0\",\"_HOSTNAME\":\"lb.example.com\",\"_MACHINE_ID\":\"9da\",\"_PID\":\"3871095\",\"_SELINUX_CONTEXT\":\"unconfined\\n\",\"_SOURCE_REALTIME_TIMESTAMP\":\"1717594440187575\",\"_SYSTEMD_CGROUP\":\"/system.slice/zabbix-agent.service\",\"_SYSTEMD_INVOCATION_ID\":\"299\",\"_SYSTEMD_SLICE\":\"system.slice\",\"_SYSTEMD_UNIT\":\"zabbix-agent.service\",\"_TRANSPORT\":\"syslog\",\"_UID\":\"0\"}"
     ,"observed_timestamp":"2024-06-05T13:34:00.522496966Z"
     ,"source_type":"opentelemetry","timestamp":"2024-06-05T13:34:00.187604Z"}
+    "#;
+
+    // Not sure where we want this. It has _AUDIT_SESSION, it has sudo.
+    // Right now it ends up in systemd.* because it wasn't matched early
+    // and it has session-*.scope.
+    pub static SYSTEMD_PURELY_BECAUSE_SCOPE: &[u8] = br#"
+    {"attributes":{"host":"H"
+    ,"job":"loki.source.journal.logs_journald_generic"
+    ,"loki.attribute.labels":"systemd_unit,job"
+    ,"observed_time_unix_nano":1717605601678748460
+    ,"section":"S","systemd_unit":"session-1845976.scope"
+    ,"tenant":"T","time_unix_nano":1717605601481345000}
+    ,"dropped_attributes_count":0
+    ,"message":"{\"_SYSTEMD_SLICE\":\"user-1234.slice\",\"_SYSTEMD_SESSION\":\"1845976\",\"_SYSTEMD_UNIT\":\"session-1845976.scope\",\"_GID\":\"1234\",\"_AUDIT_SESSION\":\"1845976\",\"SYSLOG_TIMESTAMP\":\"Jun 26 16:05:41 \",\"__REALTIME_TIMESTAMP\":\"1719410741532658\",\"_SYSTEMD_INVOCATION_ID\":\"004\",\"_PID\":\"2434090\",\"_HOSTNAME\":\"H\",\"_MACHINE_ID\":\"599\",\"PRIORITY\":\"5\",\"_EXE\":\"/usr/bin/sudo\",\"_AUDIT_LOGINUID\":\"1234\",\"SYSLOG_FACILITY\":\"10\",\"MESSAGE\":\"johnq : PWD=/home/johnq ; USER=root ; COMMAND=/bin/sh -c 'echo BECOME-SUCCESS-tsqosmhzafmhuwxpbajwyzjwkpksnksh ; /usr/bin/python3.10'\",\"_SYSTEMD_USER_SLICE\":\"-.slice\",\"_TRANSPORT\":\"syslog\",\"__MONOTONIC_TIMESTAMP\":\"20736471954579\",\"_COMM\":\"sudo\",\"_SOURCE_REALTIME_TIMESTAMP\":\"1719410741532635\",\"SYSLOG_IDENTIFIER\":\"sudo\",\"_SELINUX_CONTEXT\":\"unconfined\\n\",\"_CAP_EFFECTIVE\":\"1ffffffffff\",\"_SYSTEMD_OWNER_UID\":\"1234\",\"_UID\":\"1234\",\"_SYSTEMD_CGROUP\":\"/user.slice/user-1234.slice/session-1845976.scope\",\"_CMDLINE\":\"sudo -H -S -n -u root /bin/sh -c \\\"echo BECOME-SUCCESS-tsqosmhzafmhuwxpbajwyzjwkpksnksh ; /usr/bin/python3.10\\\"\",\"_BOOT_ID\":\"7d0\",\"__CURSOR\":\"s=99db755e814d47119c5fa7ff29d56244;i=43cc028;b=7d030e2673b447b4a5364034835413c0;m=12dc160b7493;t=61bcb8278d7f2;x=e86a3cda8944392e\"}"
+    ,"observed_timestamp":"2024-06-05T16:40:01.678748460Z"
+    ,"source_type":"opentelemetry","timestamp":"2024-06-05T16:40:01.481345Z"}
     "#;
 
     pub static TETRAGON_AUDIT: &[u8] = br#"
@@ -600,6 +679,10 @@ mod tests {
         let match_ = Match::from_attributes(&attrs).expect("match error");
         assert_eq!(match_.subject, "bulk.execve.important.secret.some-server");
 
+        let attrs = BytesAttributes::from_payload(samples::OSSO_CHANGE_ALTHOUGH_SCOPE).expect("parse error");
+        let match_ = Match::from_attributes(&attrs).expect("match error");
+        assert_eq!(match_.subject, "bulk.execve.important.secret.some-server");
+
         let attrs = BytesAttributes::from_payload(samples::TETRAGON_AUDIT).expect("parse error");
         let match_ = Match::from_attributes(&attrs).expect("match error");
         assert_eq!(match_.subject, "bulk.execve.acme.backup.abc-backup-cloud");
@@ -706,7 +789,7 @@ mod tests {
 
     #[test]
     fn test_match_ssh() {
-        let payloads: [&[u8]; 1] = [
+        let payloads: [&[u8]; 3] = [
             // $ GEN_BLOB | jq -r .message | jq .MESSAGE |
             //   sed -e 's/ user [^ ]*/ user <U>/;s/port [0-9]\+/port <P>/;s/\([0-9]*[.]\)\{3\}[0-9]*/<A>/' |
             //   sort -u
@@ -732,6 +815,8 @@ mod tests {
             // "Invalid user <U> from <A> port <P>"
             // "Received disconnect from <A> port <P>:11: Bye Bye [preauth]"
             br#"{"attributes":{"systemd_unit":"ssh.service","host":"H","tenant":"T","section":"S"},"message":"M"}"#,
+            samples::SSH_ALTHOUGH_SCOPE,
+            samples::SSH_SERVICE,
         ];
         for payload in &payloads {
             let attrs = BytesAttributes::from_payload(payload).expect("parse error");
@@ -742,12 +827,13 @@ mod tests {
 
     #[test]
     fn test_match_systemd() {
-        let payloads: [&[u8]; 5] = [
+        let payloads: [&[u8]; 6] = [
             br#"{"attributes":{"systemd_unit":"init.scope","host":"H","tenant":"T","section":"S"},"message":"M"}"#,
             br#"{"attributes":{"systemd_unit":"session-1234.scope","host":"H","tenant":"T","section":"S"},"message":"M"}"#,
             br#"{"attributes":{"systemd_unit":"systemd-networkd.service","host":"H","tenant":"T","section":"S"},"message":"M"}"#,
             br#"{"attributes":{"systemd_unit":"systemd-udev.service","host":"H","tenant":"T","section":"S"},"message":"M"}"#,
             br#"{"attributes":{"systemd_unit":"user@1234.service","host":"H","tenant":"T","section":"S"},"message":"M"}"#,
+            samples::SYSTEMD_PURELY_BECAUSE_SCOPE,
         ];
         for payload in &payloads {
             let attrs = BytesAttributes::from_payload(payload).expect("parse error");
@@ -786,7 +872,10 @@ mod tests {
 
     #[test]
     fn test_match_unknown() {
-        let payloads: [&[u8]; 2] = [samples::UNKNOWN, samples::UNKNOWN2];
+        let payloads: [&[u8]; 2] = [
+            samples::UNKNOWN,
+            samples::UNKNOWN2,
+        ];
         for payload in &payloads {
             let attrs = BytesAttributes::from_payload(payload).expect("parse error");
             let match_ = Match::from_attributes(&attrs).expect("match error");
