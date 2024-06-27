@@ -245,11 +245,19 @@ impl Match {
             }
         }
 
+        if starts_with(attrs.systemd_unit, b"getty@") &&
+                ends_with(attrs.systemd_unit, b".service") {
+            return Ok(Match {
+                // destination: "bulk_match_audit",
+                subject: format!("bulk.audit.{tenant}.{section}.{hostname}"),
+            });
+        }
+
         // Lastly. Although this is probably picked up above with
         // SYSLOG_IDENTIFIER=systemd.
         if (starts_with(attrs.systemd_unit, b"session-") &&
-            ends_with(attrs.systemd_unit, b".scope")) ||
-                 attrs.systemd_unit == b"init.scope" {
+                ends_with(attrs.systemd_unit, b".scope")) ||
+                attrs.systemd_unit == b"init.scope" {
             return Ok(Match {
                 // destination: "bulk_match_systemd",
                 subject: format!("bulk.systemd.{tenant}.{section}.{hostname}"),
