@@ -23,7 +23,7 @@ category and create new subjects.
       nats consumer add --pull --deliver=all --ack=explicit \
         --replay=instant --filter= --max-deliver=-1 --max-pending=0 \
         --no-headers-only --backoff=none \
-        bulk_unfiltered bulk_unfiltered_consumer
+        bulk_unfiltered natsomatch_unfiltered
 
   - Create a bunch of streams to write to, one for every possible
     matched subject. Also create a consumer for test purposes while
@@ -79,7 +79,7 @@ Configuration for the Rust version:
     tls.key_file = './nats_client.key'
     # Select manually made consumer from stream
     nats.stream = 'bulk_unfiltered'
-    nats.consumer = 'bulk_unfiltered_consumer'
+    nats.consumer = 'natsomatch_unfiltered'
 
     [sink]
     # Output target
@@ -119,7 +119,7 @@ TODO
 
 ☐  Monitoring improvements:
 
-- Right now we have no easy detection of streams that are not handled quickly enough. Maybe check bulk_unfiltered_consumer for "unprocessed" counts.
+- Right now we have no easy detection of streams that are not handled quickly enough. Maybe check natsomatch_unfiltered for "unprocessed" counts.
 
 ☐  Check and fix behaviour on NATS/JetStream disconnect/error. Consider auto-creating streams. (Where are the settings?)
 
