@@ -8,7 +8,9 @@ category and create new subjects.
 
   - Make sure there is a JetStream stream to read from. Creating a
     stream with a subjects set to the Vector subject will make it
-    collect the published message automatically::
+    collect the published message automatically:
+
+    .. code-block:: sh
 
       nats stream add --subjects=default.nats.vector \
         --description='All messages from vector' \
@@ -18,7 +20,9 @@ category and create new subjects.
         --dupe-window=60s --no-allow-rollup --no-deny-delete \
         --no-deny-purge --allow-direct bulk_unfiltered
 
-  - Create a consumer which we'll use to read from::
+  - Create a consumer which we'll use to read from:
+
+    .. code-block:: sh
 
       nats consumer add --pull --deliver=all --ack=explicit \
         --replay=instant --filter= --max-deliver=-1 --max-pending=5000 \
@@ -32,7 +36,9 @@ category and create new subjects.
 
   - Create a bunch of streams to write to, one for every possible
     matched subject. Also create a consumer for test purposes while
-    we're at it::
+    we're at it:
+
+    .. code-block:: sh
 
       MATCHES=$(cat lib/match/src/log_matcher.rs |
                 grep -FA2 'Ok(Match' |
