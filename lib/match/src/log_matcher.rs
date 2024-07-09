@@ -131,6 +131,13 @@ impl Match {
             });
         }
 
+        if starts_with(attrs.filename, b"/var/log/uwsgi/") {
+            return Ok(Match {
+                // destination: "bulk_match_uwsgi",
+                subject: format!("bulk.uwsgi.{tenant}.{section}.{hostname}"),
+            });
+        }
+
         if (starts_with(attrs.systemd_unit, b"systemd-") &&
                 ends_with(attrs.systemd_unit, b".service")) ||
                 (starts_with(attrs.systemd_unit, b"user@") &&
@@ -606,6 +613,20 @@ pub mod samples {
     ,"source_type":"opentelemetry","timestamp":"2024-05-30T14:19:03.355971Z"}
     "#;
 
+    pub static UWSGI: &[u8] = br#"
+    {"attributes":{"cluster":"C"
+    ,"filename":"/var/log/uwsgi/app/keystone-uwsgi-public.log","host":"H"
+    ,"log.file.name":"keystone-uwsgi-public.log"
+    ,"log.file.path":"/var/log/uwsgi/app/keystone-uwsgi-public.log"
+    ,"loki.attribute.labels":"filename"
+    ,"observed_time_unix_nano":1720535070919893839,"section":"S","tenant":"T"
+    ,"time_unix_nano":1720535070919770670},"dropped_attributes_count":0
+    ,"message":"[pid: 2441|app: 0|req: 22440/134934] 1.2.3.4 () {40 vars in 982 bytes} [Tue Jul  9 16:24:30 2024] GET /v3/auth/tokens?nocatalog => generated 721 bytes in 28 msecs (HTTP/1.1 200) 6 headers in 379 bytes (1 switches on core 0)"
+    ,"observed_timestamp":"2024-07-09T14:24:30.919893839Z"
+    ,"source_type":"opentelemetry"
+    ,"timestamp":"2024-07-09T14:24:30.919770670Z"}
+    "#;
+
     pub static XINETD_AUDIT: &[u8] = br#"
     {"attributes":{"host":"H","job":"loki.source.journal.logs_journald_generic"
     ,"loki.attribute.labels":"job,systemd_unit"
@@ -936,6 +957,19 @@ mod tests {
             let attrs = BytesAttributes::from_payload(payload).expect("parse error");
             let match_ = Match::from_attributes(&attrs).expect("match error");
             assert_eq!(match_.subject, "bulk.systemd.T.S.H");
+        }
+    }
+
+    #[test]
+    fn test_match_uwsgi() {
+        let payloads: [&[u8]; 2] = [
+            samples::UWSGI,
+            br#"{"attributes":{"filename":"/var/log/uwsgi/app/bosso.log","host":"H","tenant":"T","section":"S"},"message":"M"}"#,
+        ];
+        for payload in &payloads {
+            let attrs = BytesAttributes::from_payload(payload).expect("parse error");
+            let match_ = Match::from_attributes(&attrs).expect("match error");
+            assert_eq!(match_.subject, "bulk.uwsgi.T.S.H");
         }
     }
 
