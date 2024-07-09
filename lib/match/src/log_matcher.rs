@@ -210,6 +210,13 @@ impl Match {
             });
         }
 
+        if attrs.systemd_unit == b"apache2.service" {
+            return Ok(Match {
+                // destination: "bulk_match_apache2",
+                subject: format!("bulk.apache2.{tenant}.{section}.{hostname}"),
+            });
+        }
+
         if attrs.systemd_unit == b"aide.service" ||
                 attrs.systemd_unit == b"aidecheck.service" ||
                 attrs.systemd_unit == b"aidecheck.timer" ||
@@ -340,6 +347,18 @@ fn memmem(haystack: &[u8], needle: &[u8]) -> Option<usize> {
 
 #[cfg(any(test, feature = "benchmark"))]
 pub mod samples {
+    pub static APACHE2: &[u8] = br#"
+    {"attributes":{"cluster":"C","host":"H"
+    ,"job":"loki.source.journal.logs_journald_generic"
+    ,"loki.attribute.labels":"job,systemd_unit"
+    ,"observed_time_unix_nano":1720535070907586156,"section":"S"
+    ,"systemd_unit":"apache2.service","tenant":"T"
+    ,"time_unix_nano":1720535070907236000},"dropped_attributes_count":0
+    ,"message":"{\"MESSAGE\":\"www.example.com:443 1.2.3.4 - - [09/Jul/2024:16:24:30 +0200] \\\"GET /index.html HTTP/1.1\\\" 200 1243 \\\"-\\\" \\\"python-urllib\\\" TLSv1.3 TLS_AES_256_GCM_SHA384\",\"PRIORITY\":\"6\",\"SYSLOG_IDENTIFIER\":\"www_example_com_access_log\",\"_BOOT_ID\":\"e27\",\"_CAP_EFFECTIVE\":\"3fffffffff\",\"_CMDLINE\":\"/bin/cat\",\"_COMM\":\"cat\",\"_EXE\":\"/usr/bin/cat\",\"_GID\":\"0\",\"_HOSTNAME\":\"H\",\"_MACHINE_ID\":\"77e\",\"_PID\":\"1648\",\"_SELINUX_CONTEXT\":\"unconfined\\n\",\"_STREAM_ID\":\"ced\",\"_SYSTEMD_CGROUP\":\"/system.slice/apache2.service\",\"_SYSTEMD_INVOCATION_ID\":\"9fb\",\"_SYSTEMD_SLICE\":\"system.slice\",\"_SYSTEMD_UNIT\":\"apache2.service\",\"_TRANSPORT\":\"stdout\",\"_UID\":\"0\"}"
+    ,"observed_timestamp":"2024-07-09T14:24:30.907586156Z"
+    ,"source_type":"opentelemetry","timestamp":"2024-07-09T14:24:30.907236Z"}
+    "#;
+
     pub static AUDITD: &[u8] = br#"
     {"attributes":{"cluster":"C","host":"H"
     ,"job":"loki.source.journal.logs_journald_generic"
@@ -661,6 +680,13 @@ mod tests {
         assert!(memmem(b"", b"nope").is_none());
         assert!(memmem(b"ye", b"yea").is_none());
         assert!(memmem(b"yeap", b"nope").is_none());
+    }
+
+    #[test]
+    fn test_match_apache2() {
+        let attrs = BytesAttributes::from_payload(samples::APACHE2).expect("parse error");
+        let match_ = Match::from_attributes(&attrs).expect("match error");
+        assert_eq!(match_.subject, "bulk.apache2.T.S.H");
     }
 
     #[test]
