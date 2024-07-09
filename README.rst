@@ -21,9 +21,14 @@ category and create new subjects.
   - Create a consumer which we'll use to read from::
 
       nats consumer add --pull --deliver=all --ack=explicit \
-        --replay=instant --filter= --max-deliver=-1 --max-pending=0 \
+        --replay=instant --filter= --max-deliver=-1 --max-pending=5000 \
         --no-headers-only --backoff=none \
         bulk_unfiltered natsomatch_unfiltered
+
+    *max-pending defines the max amount of unacked messages that can be
+    pending at the same time. If you set dev.max_messages_per_batch
+    on the input, you'll need max-pending at or above that number times
+    the amount of natsomatch workers.*
 
   - Create a bunch of streams to write to, one for every possible
     matched subject. Also create a consumer for test purposes while
