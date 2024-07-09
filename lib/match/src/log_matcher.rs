@@ -131,6 +131,13 @@ impl Match {
             });
         }
 
+        if starts_with(attrs.filename, b"/var/log/redis/") {
+            return Ok(Match {
+                // destination: "bulk_match_redis",
+                subject: format!("bulk.redis.{tenant}.{section}.{hostname}"),
+            });
+        }
+
         if starts_with(attrs.filename, b"/var/log/uwsgi/") {
             return Ok(Match {
                 // destination: "bulk_match_uwsgi",
@@ -903,6 +910,18 @@ mod tests {
         let attrs = BytesAttributes::from_payload(samples::NGINX).expect("parse error");
         let match_ = Match::from_attributes(&attrs).expect("match error");
         assert_eq!(match_.subject, "bulk.nginx.acme.cust1.lb1-zl-example-com");
+    }
+
+    #[test]
+    fn test_match_redis() {
+        let payloads: [&[u8]; 1] = [
+            br#"{"attributes":{"filename":"/var/log/redis/redis-server.log","host":"H","tenant":"T","section":"S"},"message":"M"}"#,
+        ];
+        for payload in &payloads {
+            let attrs = BytesAttributes::from_payload(payload).expect("parse error");
+            let match_ = Match::from_attributes(&attrs).expect("match error");
+            assert_eq!(match_.subject, "bulk.redis.T.S.H");
+        }
     }
 
     #[test]
