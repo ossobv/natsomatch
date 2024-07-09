@@ -88,13 +88,24 @@ impl Match {
             }
         }
 
-        if attrs.systemd_unit == b"kube-apiserver.service"  ||
+        if attrs.systemd_unit == b"kube-apiserver.service" ||
                 attrs.systemd_unit == b"kube-controller-manager.service" ||
                 attrs.systemd_unit == b"kube-scheduler.service" ||
                 attrs.systemd_unit == b"kubelet.service" {
             return Ok(Match {
                 // destination: "bulk_match_k8s",
                 subject: format!("bulk.k8s.{tenant}.{section}.{hostname}"),
+            });
+        }
+
+        if attrs.systemd_unit == b"postfix@-.service" ||
+                attrs.systemd_unit == b"postfix.service" ||
+                attrs.systemd_unit == b"opendkim.service" ||
+                (starts_with(attrs.systemd_unit, b"postfix@") &&
+                 ends_with(attrs.systemd_unit, b".service")) {
+            return Ok(Match {
+                // destination: "bulk_match_mail",
+                subject: format!("bulk.mail.{tenant}.{section}.{hostname}"),
             });
         }
 
@@ -487,6 +498,17 @@ pub mod samples {
     ,"source_type":"opentelemetry","timestamp":"2024-05-30T14:50:24.000032Z"}
     "#;
 
+    pub static POSTFIX: &[u8] = br#"
+    {"attributes":{"host":"H","job":"loki.source.journal.logs_journald_generic"
+    ,"loki.attribute.labels":"job,systemd_unit"
+    ,"observed_time_unix_nano":1720535053980749215,"section":"S"
+    ,"systemd_unit":"postfix@-.service","tenant":"T"
+    ,"time_unix_nano":1720469478817912000},"dropped_attributes_count":0
+    ,"message":"{\"MESSAGE\":\"ALLOWLISTED [10.20.30.40]:22588\",\"PRIORITY\":\"6\",\"SYSLOG_FACILITY\":\"2\",\"SYSLOG_IDENTIFIER\":\"postfix/postscreen\",\"SYSLOG_PID\":\"1674\",\"SYSLOG_TIMESTAMP\":\"Jul  8 22:11:18 \",\"_BOOT_ID\":\"f28\",\"_CAP_EFFECTIVE\":\"0\",\"_CMDLINE\":\"postscreen -l -n smtp -t inet -u -c\",\"_COMM\":\"postscreen\",\"_EXE\":\"/usr/lib/postfix/sbin/postscreen\",\"_GID\":\"114\",\"_HOSTNAME\":\"H\",\"_MACHINE_ID\":\"b6c\",\"_PID\":\"1674\",\"_SELINUX_CONTEXT\":\"unconfined\\n\",\"_SOURCE_REALTIME_TIMESTAMP\":\"1720469478817233\",\"_SYSTEMD_CGROUP\":\"/system.slice/system-postfix.slice/postfix@-.service\",\"_SYSTEMD_INVOCATION_ID\":\"cf9\",\"_SYSTEMD_SLICE\":\"system-postfix.slice\",\"_SYSTEMD_UNIT\":\"postfix@-.service\",\"_TRANSPORT\":\"syslog\",\"_UID\":\"108\"}"
+    ,"observed_timestamp":"2024-07-09T14:24:13.980749215Z"
+    ,"source_type":"opentelemetry","timestamp":"2024-07-08T20:11:18.817912Z"}
+    "#;
+
     pub static SSH_ALTHOUGH_SCOPE: &[u8] = br#"
     {"attributes":{"host":"H"
     ,"job":"loki.source.journal.logs_journald_generic"
@@ -784,6 +806,21 @@ mod tests {
             let attrs = BytesAttributes::from_payload(payload).expect("parse error");
             let match_ = Match::from_attributes(&attrs).expect("match error");
             assert_eq!(match_.subject, "bulk.k8s-audit.T.S.H");
+        }
+    }
+
+    #[test]
+    fn test_match_mail() {
+        let payloads: [&[u8]; 4] = [
+            samples::POSTFIX,
+            br#"{"attributes":{"systemd_unit":"opendkim.service","host":"H","tenant":"T","section":"S"},"message":"M"}"#,
+            br#"{"attributes":{"systemd_unit":"postfix.service","host":"H","tenant":"T","section":"S"},"message":"M"}"#,
+            br#"{"attributes":{"systemd_unit":"postfix@ext-mail.service","host":"H","tenant":"T","section":"S"},"message":"M"}"#,
+        ];
+        for payload in &payloads {
+            let attrs = BytesAttributes::from_payload(payload).expect("parse error");
+            let match_ = Match::from_attributes(&attrs).expect("match error");
+            assert_eq!(match_.subject, "bulk.mail.T.S.H");
         }
     }
 
