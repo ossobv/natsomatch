@@ -192,6 +192,13 @@ impl Match {
             });
         }
 
+        if attrs.systemd_unit == b"cron.service" {
+            return Ok(Match {
+                // destination: "bulk_match_cron",
+                subject: format!("bulk.cron.{tenant}.{section}.{hostname}"),
+            });
+        }
+
         if attrs.systemd_unit == b"aide.service" ||
                 attrs.systemd_unit == b"aidecheck.service" ||
                 attrs.systemd_unit == b"aidecheck.timer" ||
@@ -332,6 +339,18 @@ pub mod samples {
     ,"message":"{\"MESSAGE\":\"Audit daemon rotating log files\",\"PRIORITY\":\"5\",\"SYSLOG_FACILITY\":\"3\",\"SYSLOG_IDENTIFIER\":\"auditd\",\"SYSLOG_PID\":\"298087\",\"SYSLOG_TIMESTAMP\":\"Jun  5 17:50:02 \",\"_BOOT_ID\":\"adc\",\"_CAP_EFFECTIVE\":\"1fffffeffff\",\"_CMDLINE\":\"/sbin/auditd\",\"_COMM\":\"auditd\",\"_EXE\":\"/usr/sbin/auditd\",\"_GID\":\"0\",\"_HOSTNAME\":\"H\",\"_MACHINE_ID\":\"9df\",\"_PID\":\"298087\",\"_SELINUX_CONTEXT\":\"unconfined\\n\",\"_SOURCE_REALTIME_TIMESTAMP\":\"1717602602570069\",\"_SYSTEMD_CGROUP\":\"/system.slice/auditd.service\",\"_SYSTEMD_INVOCATION_ID\":\"598\",\"_SYSTEMD_SLICE\":\"system.slice\",\"_SYSTEMD_UNIT\":\"auditd.service\",\"_TRANSPORT\":\"syslog\",\"_UID\":\"0\"}"'
     ,"observed_timestamp":"2024-06-05T15:50:02.596264580Z"
     ,"source_type":"opentelemetry","timestamp":"2024-06-05T15:50:02.570258Z"}
+    "#;
+
+    pub static CRON: &[u8] = br#"
+    {"attributes":{"cluster":"C","host":"H"
+    ,"job":"loki.source.journal.logs_journald_generic"
+    ,"loki.attribute.labels":"job,systemd_unit"
+    ,"observed_time_unix_nano":1720535019066341120,"section":"S"
+    ,"systemd_unit":"cron.service","tenant":"T"
+    ,"time_unix_nano":1720499702010964000},"dropped_attributes_count":0
+    ,"message":"{\"MESSAGE\":\"(root) CMD (ETCDCTL_API=3 etcdctl --cert /etc/kubernetes/pki/etcd/healthcheck-client.crt --key /etc/kubernetes/pki/etcd/healthcheck-client.key --cacert /etc/kubernetes/pki/etcd/ca.crt --endpoints=https://10.20.30.40:2379 endpoint health --write-out='json' \\u003e /tmp/zabbix-etcd3-endpointhealth.json.part 2\\u003e /dev/null; mv /tmp/zabbix-etcd3-endpointhealth.json.part /tmp/zabbix-etcd3-endpointhealth.json)\",\"PRIORITY\":\"6\",\"SYSLOG_FACILITY\":\"9\",\"SYSLOG_IDENTIFIER\":\"CRON\",\"SYSLOG_PID\":\"2626748\",\"SYSLOG_TIMESTAMP\":\"Jul  9 06:35:02 \",\"_AUDIT_LOGINUID\":\"0\",\"_AUDIT_SESSION\":\"55294\",\"_BOOT_ID\":\"689\",\"_CAP_EFFECTIVE\":\"1ffffffffff\",\"_CMDLINE\":\"/usr/sbin/CRON -f -P\",\"_COMM\":\"cron\",\"_EXE\":\"/usr/sbin/cron\",\"_GID\":\"0\",\"_HOSTNAME\":\"H\",\"_MACHINE_ID\":\"9ed\",\"_PID\":\"2626748\",\"_SELINUX_CONTEXT\":\"unconfined\\n\",\"_SOURCE_REALTIME_TIMESTAMP\":\"1720499702010926\",\"_SYSTEMD_CGROUP\":\"/system.slice/cron.service\",\"_SYSTEMD_INVOCATION_ID\":\"ecd\",\"_SYSTEMD_SLICE\":\"system.slice\",\"_SYSTEMD_UNIT\":\"cron.service\",\"_TRANSPORT\":\"syslog\",\"_UID\":\"0\"}"
+    ,"observed_timestamp":"2024-07-09T14:23:39.066341120Z"
+    ,"source_type":"opentelemetry","timestamp":"2024-07-09T04:35:02.010964Z"}
     "#;
 
     pub static ETCD: &[u8] = br#"
@@ -578,10 +597,10 @@ pub mod samples {
     ,"job":"loki.source.journal.logs_journald_generic"
     ,"loki.attribute.labels":"systemd_unit,job"
     ,"observed_time_unix_nano":1717605601678748460
-    ,"section":"unknown-section","systemd_unit":"cron.service"
+    ,"section":"unknown-section","systemd_unit":"notcron.service"
     ,"tenant":"unknown-tenant","time_unix_nano":1717605601481345000}
     ,"dropped_attributes_count":0
-    ,"message":"{\"MESSAGE\":\"[REDIS Keyspace] db0:keys=1,expires=0,avg_ttl=0 db1:keys=48142,expires=0,avg_ttl=0 db2:keys=178368,expires=0,avg_ttl=0 db3:keys=5,expires=0,avg_ttl=0 db4:keys=384,expires=0,avg_ttl=0 db5:keys=17,expires=0,avg_ttl=0 db6:keys=17,expires=0,avg_ttl=0 db8:keys=5,expires=0,avg_ttl=0 db9:keys=5,expires=0,avg_ttl=0 db10:keys=17,expires=0,avg_ttl=0 db12:keys=17,expires=0,avg_ttl=0 db13:keys=19082,expires=0,avg_ttl=0 db14:keys=5,expires=0,avg_ttl=0 db15:keys=5,expires=0,avg_ttl=0 db16:keys=24590,expires=0,avg_ttl=0 db18:keys=17,expires=0,avg_ttl=0 db19:keys=8054,expires=0,avg_ttl=0 db20:keys=17,expires=0,avg_ttl=0 db21:keys=4285,expires=0,avg_ttl=0 db23:keys=17,expires=0,avg_ttl=0 db25:keys=15659,expires=0,avg_ttl=0 db26:keys=13985,expires=0,avg_ttl=0 db27:keys=17,expires=0,avg_ttl=0\",\"PRIORITY\":\"6\",\"SYSLOG_IDENTIFIER\":\"redis-stats\",\"_AUDIT_LOGINUID\":\"0\",\"_AUDIT_SESSION\":\"259108\",\"_BOOT_ID\":\"be8\",\"_CAP_EFFECTIVE\":\"1ffffffffff\",\"_COMM\":\"cat\",\"_GID\":\"0\",\"_HOSTNAME\":\"unknown.example.com\",\"_LINE_BREAK\":\"eof\",\"_MACHINE_ID\":\"bb6\",\"_PID\":\"342645\",\"_SELINUX_CONTEXT\":\"unconfined\\n\",\"_STREAM_ID\":\"0c8\",\"_SYSTEMD_CGROUP\":\"/system.slice/cron.service\",\"_SYSTEMD_INVOCATION_ID\":\"797\",\"_SYSTEMD_SLICE\":\"system.slice\",\"_SYSTEMD_UNIT\":\"cron.service\",\"_TRANSPORT\":\"stdout\",\"_UID\":\"0\"}"
+    ,"message":"{\"MESSAGE\":\"[REDIS Keyspace] db0:keys=1,expires=0,avg_ttl=0 db1:keys=48142,expires=0,avg_ttl=0 db2:keys=178368,expires=0,avg_ttl=0 db3:keys=5,expires=0,avg_ttl=0 db4:keys=384,expires=0,avg_ttl=0 db5:keys=17,expires=0,avg_ttl=0 db6:keys=17,expires=0,avg_ttl=0 db8:keys=5,expires=0,avg_ttl=0 db9:keys=5,expires=0,avg_ttl=0 db10:keys=17,expires=0,avg_ttl=0 db12:keys=17,expires=0,avg_ttl=0 db13:keys=19082,expires=0,avg_ttl=0 db14:keys=5,expires=0,avg_ttl=0 db15:keys=5,expires=0,avg_ttl=0 db16:keys=24590,expires=0,avg_ttl=0 db18:keys=17,expires=0,avg_ttl=0 db19:keys=8054,expires=0,avg_ttl=0 db20:keys=17,expires=0,avg_ttl=0 db21:keys=4285,expires=0,avg_ttl=0 db23:keys=17,expires=0,avg_ttl=0 db25:keys=15659,expires=0,avg_ttl=0 db26:keys=13985,expires=0,avg_ttl=0 db27:keys=17,expires=0,avg_ttl=0\",\"PRIORITY\":\"6\",\"SYSLOG_IDENTIFIER\":\"redis-stats\",\"_AUDIT_LOGINUID\":\"0\",\"_AUDIT_SESSION\":\"259108\",\"_BOOT_ID\":\"be8\",\"_CAP_EFFECTIVE\":\"1ffffffffff\",\"_COMM\":\"cat\",\"_GID\":\"0\",\"_HOSTNAME\":\"unknown.example.com\",\"_LINE_BREAK\":\"eof\",\"_MACHINE_ID\":\"bb6\",\"_PID\":\"342645\",\"_SELINUX_CONTEXT\":\"unconfined\\n\",\"_STREAM_ID\":\"0c8\",\"_SYSTEMD_CGROUP\":\"/system.slice/notcron.service\",\"_SYSTEMD_INVOCATION_ID\":\"797\",\"_SYSTEMD_SLICE\":\"system.slice\",\"_SYSTEMD_UNIT\":\"notcron.service\",\"_TRANSPORT\":\"stdout\",\"_UID\":\"0\"}"
     ,"observed_timestamp":"2024-06-05T16:40:01.678748460Z"
     ,"source_type":"opentelemetry","timestamp":"2024-06-05T16:40:01.481345Z"}
     "#;
@@ -659,6 +678,13 @@ mod tests {
         let attrs = BytesAttributes::from_payload(samples::XINETD_AUDIT).expect("parse error");
         let match_ = Match::from_attributes(&attrs).expect("match error");
         assert_eq!(match_.subject, "bulk.audit.T.S.H");
+    }
+
+    #[test]
+    fn test_match_cron() {
+        let attrs = BytesAttributes::from_payload(samples::CRON).expect("parse error");
+        let match_ = Match::from_attributes(&attrs).expect("match error");
+        assert_eq!(match_.subject, "bulk.cron.T.S.H");
     }
 
     #[test]
