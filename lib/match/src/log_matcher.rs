@@ -98,6 +98,15 @@ impl Match {
             });
         }
 
+        if (starts_with(attrs.systemd_unit, b"swift@") ||
+                starts_with(attrs.systemd_unit, b"swift-init@")) &&
+                ends_with(attrs.systemd_unit, b".service") {
+            return Ok(Match {
+                // destination: "bulk_match_openstack",
+                subject: format!("bulk.openstack.{tenant}.{section}.{hostname}"),
+            });
+        }
+
         if attrs.systemd_unit == b"postfix@-.service" ||
                 attrs.systemd_unit == b"postfix.service" ||
                 attrs.systemd_unit == b"opendkim.service" ||
@@ -959,6 +968,22 @@ mod tests {
             let attrs = BytesAttributes::from_payload(payload).expect("parse error");
             let match_ = Match::from_attributes(&attrs).expect("match error");
             assert_eq!(match_.subject, "bulk.ssh.T.S.H");
+        }
+    }
+
+    #[test]
+    fn test_match_openstack() {
+        let payloads: [&[u8]; 5] = [
+            br#"{"attributes":{"systemd_unit":"swift@account-replicator.service","host":"H","tenant":"T","section":"S"},"message":"M"}"#,
+            br#"{"attributes":{"systemd_unit":"swift-init@account-server.service","host":"H","tenant":"T","section":"S"},"message":"M"}"#,
+            br#"{"attributes":{"systemd_unit":"swift-init@container-server.service","host":"H","tenant":"T","section":"S"},"message":"M"}"#,
+            br#"{"attributes":{"systemd_unit":"swift-init@object-server.service","host":"H","tenant":"T","section":"S"},"message":"M"}"#,
+            br#"{"attributes":{"systemd_unit":"swift@object-replicator.service","host":"H","tenant":"T","section":"S"},"message":"M"}"#,
+        ];
+        for payload in &payloads {
+            let attrs = BytesAttributes::from_payload(payload).expect("parse error");
+            let match_ = Match::from_attributes(&attrs).expect("match error");
+            assert_eq!(match_.subject, "bulk.openstack.T.S.H");
         }
     }
 
