@@ -3,7 +3,7 @@
 [package]
 name = "natsomatch"
 edition = "2021"
-version = "0.3.0"
+version = "0.3.1"
 #authors = ["Alice <a@example.com>", "Bob <b@example.com>"]
 
 # https://github.com/johnthagen/min-sized-rust
