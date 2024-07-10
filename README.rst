@@ -47,9 +47,10 @@ category and create new subjects.
 
       for match in $MATCHES; do
 
-        nats stream add --subjects="bulk.$tp.>" --description="Bulk $match" \
-          --storage=file --replicas=3 --retention=limits --discard=old \
-          --max-bytes=2GiB --max-msgs=-1 --max-msgs-per-subject=-1 \
+        nats stream add --subjects="bulk.$match.>" \
+          --description="Bulk $match" --storage=file --replicas=3 \
+          --retention=limits --discard=old --max-bytes=2GiB \
+          --max-msgs=-1 --max-msgs-per-subject=-1 \
           --max-age=-1 --max-msg-size=-1 --dupe-window=60s --no-allow-rollup \
           --no-deny-delete --no-deny-purge --allow-direct "bulk_match_${match}"
 
