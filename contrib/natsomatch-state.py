@@ -103,8 +103,7 @@ def main():
                 seen_unknown_stream = True
         else:
             stream = Stream.build(stream_name, *stream_info)
-
-        streams.append(stream)
+            streams.append(stream)
 
     fmth = (
         '{name:22s}  {age:>4s}  {bytes:>6s}  {msgs:>6s}  {speed:>7s}  {desc}')
