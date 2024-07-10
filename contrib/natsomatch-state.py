@@ -121,24 +121,25 @@ def main():
             streams.append(stream)
 
     fmth = (
-        '{name:22s}  {age:>4s}  {bytes:>6s}  {msgs:>6s}  {speed:>7s}  {desc}')
+        '{name:22s}  {age:>6s}  {size_g:>3s}  {msgs:>6s}  {speed:>7s}  {desc}')
     fmtd = (
-        '{name:22s}  {age:3d}h  {bytes:5d}G{is_full} {msgs:5}k  '
-        '{speed:4d}k/h  {desc}')
+        '{name:22s}  {age_h:3d}h{age_m:02d}  {size_g:2d}G{is_full} '
+        '{msgs:5}k  {speed:5d}/s  {desc}')
     print(fmth.format(
-        name='NAME', age='AGE', bytes='BYTES', msgs='MSGS',
+        name='NAME', age='AGE', size_g='SIZ', msgs='MSGS',
         speed='SPEED', desc='DESCRIPTION'))
     for stream in streams:
         try:
-            speed = int(round(stream.msgs_k / stream.age_h))
+            speed = int(round(stream.msgs_k / stream.age_h / 3600 * 1000))
         except ZeroDivisionError:
             speed = 0
+        age_h = int(stream.age_h)
+        age_m = int((stream.age_h % 1) * 60)
         print(fmtd.format(
-            name=stream.name, age=int(stream.age_h),
-            bytes=int(round(stream.bytes_gb)),
+            name=stream.name, age_h=age_h, age_m=age_m,
+            size_g=int(round(stream.bytes_gb)),
             is_full=(' ' if stream.is_full else '-'),
-            msgs=int(round(stream.msgs_k)),
-            speed=speed,
+            msgs=int(round(stream.msgs_k)), speed=speed,
             desc=stream.description))
 
 
