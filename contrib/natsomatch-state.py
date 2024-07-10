@@ -70,6 +70,9 @@ class Stream:
 
     @staticmethod
     def parse_tz(tzstr):
+        if tzstr == '0001-01-01T00:00:00Z':
+            return datetime(1970, 1, 1), 0
+
         assert tzstr.startswith('2') and tzstr.endswith('Z'), tzstr
         tzstr, nanosecs = tzstr.rsplit('.', 1)
         nanosecs = nanosecs[0:-1].ljust(9, '0')
@@ -126,12 +129,16 @@ def main():
         name='NAME', age='AGE', bytes='BYTES', msgs='MSGS',
         speed='SPEED', desc='DESCRIPTION'))
     for stream in streams:
+        try:
+            speed = int(round(stream.msgs_k / stream.age_h))
+        except ZeroDivisionError:
+            speed = 0
         print(fmtd.format(
             name=stream.name, age=int(stream.age_h),
             bytes=int(round(stream.bytes_gb)),
             is_full=(' ' if stream.is_full else '-'),
             msgs=int(round(stream.msgs_k)),
-            speed=int(round(stream.msgs_k / stream.age_h)),
+            speed=speed,
             desc=stream.description))
 
 
