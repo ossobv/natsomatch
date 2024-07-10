@@ -15,8 +15,12 @@ from sys import stderr
 StreamInfo = namedtuple('StreamInfo', 'description')
 
 EXPECTED_STREAMS = {
+    'standard_events': StreamInfo('Post-processed events, including security events'),
+
+    'bulk_match_apache2': StreamInfo('Apache2 webserver logs'),
     'bulk_match_aide': StreamInfo('AIDE changed files monitoring'),
     'bulk_match_audit': StreamInfo('Misc. auditd/pam logging'),
+    'bulk_match_cron': StreamInfo('Misc. cron logging'),
     'bulk_match_devinfra': StreamInfo('Git/CI/CD workflow'),
     'bulk_match_etcd': StreamInfo('etcd logs'),
     'bulk_match_execve': StreamInfo('Monitoring execve() calls'),
@@ -25,15 +29,23 @@ EXPECTED_STREAMS = {
     'bulk_match_hids': StreamInfo('Anti-virus (ClamAV) logs'),
     'bulk_match_k8s': StreamInfo('Kubernetes logs'),
     'bulk_match_k8s-audit': StreamInfo('Kubernetes audit logs'),
+    'bulk_match_mail': StreamInfo('Postfix/Exim/helpers'),
     'bulk_match_monitoring': StreamInfo('Gocollect/Zabbix logs'),
     'bulk_match_nginx': StreamInfo('nginx requests/logs'),
     'bulk_match_nids': StreamInfo('Suricata logs'),
+    'bulk_match_openstack': StreamInfo('OpenStack Swift/other logs'),
+    'bulk_match_redis': StreamInfo('Redis key value store'),
     'bulk_match_ssh': StreamInfo('ssh logs (without pam noise)'),
     'bulk_match_systemd': StreamInfo('systemd daemon logs'),
-    'bulk_match_unknown': StreamInfo('Logs not matched by something else'),
+    'bulk_match_unknown': StreamInfo('Logs not matched by any rules'),
+    'bulk_match_uwsgi': StreamInfo('uWSGI webserver logs'),
     'bulk_match_v12n': StreamInfo('containerd/docker logs'),
     'bulk_match_vault': StreamInfo('Vault logs'),
+
     'bulk_unfiltered': StreamInfo('Input'),
+
+    'bulk_match_aide-json': StreamInfo('(obsolete) AIDE changed files monitoring'),
+    'security_events': StreamInfo('(obsolete) Previous security events stream'),
 }
 
 
