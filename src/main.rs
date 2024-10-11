@@ -143,19 +143,25 @@ async fn main() -> Result<(), Box<dyn Error>> {
             };
             let prep_td = prep_t0.elapsed();
 
-            // Publish
-            // FIXME: publishing should be done in a separate handler so we can continue
-            // parsing the others asynchronously? Useful if we'd publish to multiple locations.
             let pub_t0 = Instant::now();
-            let dst_acker = match sink.publish(match_.subject.clone(), msg.payload).await {
-                Ok(maybe_ack) => { maybe_ack },
-                Err(err) => { eprintln!("error on publish(1) of subject {}: {}", match_.subject, err); continue; },
-            };
-            match dst_acker.await { // try acking the dest
-                Ok(_) => { src_acker.ack().await.unwrap(); /* ack the source; FIXME error handling */ },
-                // FIXME: When publish(2) fails, it might be because there is no stream and we
-                // cannot get an ack. Should we auto-create the stream?
-                Err(err) => { eprintln!("error on publish(2) of subject {}: {}", match_.subject, err); break; },
+            if match_.subject.starts_with("bulk.haproxy.") {
+                src_acker.ack().await.unwrap();
+            } else if match_.subject.starts_with("bulk.nginx.") {
+                src_acker.ack().await.unwrap();
+            } else {
+                // Publish
+                // FIXME: publishing should be done in a separate handler so we can continue
+                // parsing the others asynchronously? Useful if we'd publish to multiple locations.
+                let dst_acker = match sink.publish(match_.subject.clone(), msg.payload).await {
+                    Ok(maybe_ack) => { maybe_ack },
+                    Err(err) => { eprintln!("error on publish(1) of subject {}: {}", match_.subject, err); continue; },
+                };
+                match dst_acker.await { // try acking the dest
+                    Ok(_) => { src_acker.ack().await.unwrap(); /* ack the source; FIXME error handling */ },
+                    // FIXME: When publish(2) fails, it might be because there is no stream and we
+                    // cannot get an ack. Should we auto-create the stream?
+                    Err(err) => { eprintln!("error on publish(2) of subject {}: {}", match_.subject, err); break; },
+                }
             }
             let pub_td = pub_t0.elapsed();
 
