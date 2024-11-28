@@ -144,15 +144,19 @@ async fn main() -> Result<(), Box<dyn Error>> {
             let prep_td = prep_t0.elapsed();
 
             let pub_t0 = Instant::now();
-            if match_.subject.starts_with("bulk.haproxy.") {
+
+            if match_.subject.starts_with('.') ||
+                    match_.subject.ends_with('.') ||
+                    match_.subject.contains("..") {
+                // FIXME: Need to explain why/when this happens.
+                eprintln!("IGNORING: {}; {:?}", match_.subject, msg.payload);
+                src_acker.ack().await.unwrap();
+            /*
+            } else if match_.subject.starts_with("bulk.haproxy.") {
                 src_acker.ack().await.unwrap();
             } else if match_.subject.starts_with("bulk.nginx.") {
                 src_acker.ack().await.unwrap();
-            } else if match_.subject.starts_with('.') ||
-                    match_.subject.ends_with('.') ||
-                    match_.subject.contains("..") {
-                eprintln!("IGNORING: {}; {:?}", match_.subject, msg.payload);
-                src_acker.ack().await.unwrap();
+            */
             } else {
                 // Publish
                 // FIXME: publishing should be done in a separate handler so we can continue
