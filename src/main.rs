@@ -151,12 +151,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 // FIXME: Need to explain why/when this happens.
                 eprintln!("IGNORING: {}; {:?}", match_.subject, msg.payload);
                 src_acker.ack().await.unwrap();
-            /*
             } else if match_.subject.starts_with("bulk.haproxy.") {
                 src_acker.ack().await.unwrap();
             } else if match_.subject.starts_with("bulk.nginx.") {
                 src_acker.ack().await.unwrap();
-            */
             } else {
                 // Publish
                 // FIXME: publishing should be done in a separate handler so we can continue
