@@ -240,6 +240,13 @@ impl Match {
             });
         }
 
+        if attrs.systemd_unit == b"openvpn@server.service" {
+            return Ok(Match {
+                // destination: "bulk_match_vpn",
+                subject: format!("bulk.vpn.{tenant}.{section}.{hostname}"),
+            });
+        }
+
         if attrs.systemd_unit == b"aide.service" ||
                 attrs.systemd_unit == b"aidecheck.service" ||
                 attrs.systemd_unit == b"aidecheck.timer" ||
