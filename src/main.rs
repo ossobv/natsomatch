@@ -154,6 +154,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
             break;
         } else if match_.subject.starts_with("bulk.haproxy.") ||
                 match_.subject.starts_with("bulk.nginx.") {
+            // NOTE: For now, we ignore these because they have significant traffic, and we're not
+            // using these.
             src_acker.ack().await.unwrap();
         } else {
             // Publish
