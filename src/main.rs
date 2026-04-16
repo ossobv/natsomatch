@@ -142,19 +142,30 @@ async fn main() -> Result<(), Box<dyn Error>> {
         };
         let prep_td = prep_t0.elapsed();
 
-        // Publish
-        // FIXME: publishing should be done in a separate handler so we can continue
-        // parsing the others asynchronously? Useful if we'd publish to multiple locations.
         let pub_t0 = Instant::now();
-        let dst_acker = match sink.publish(match_.subject.clone(), msg.payload).await {
-            Ok(maybe_ack) => { maybe_ack },
-            Err(err) => { eprintln!("error on publish(1) of subject {}: {}", match_.subject, err); continue; },
-        };
-        match dst_acker.await { // try acking the dest
-            Ok(_) => { src_acker.ack().await.unwrap(); /* ack the source; FIXME error handling */ },
-            // FIXME: When publish(2) fails, it might be because there is no stream and we
-            // cannot get an ack. Should we auto-create the stream?
-            Err(err) => { eprintln!("error on publish(2) of subject {}: {}", match_.subject, err); break; },
+
+        if match_.subject.starts_with('.') ||
+                match_.subject.ends_with('.') ||
+                match_.subject.contains("..") {
+            // We print an error. We ack it so we're not stuck. But we also exit, so someone
+            // has a chance to look at this and examine.
+            eprintln!("unexpected subject: {}; ack+abort; {:?}", match_.subject, msg.payload);
+            src_acker.ack().await.unwrap();
+            break;
+        } else {
+            // Publish
+            // FIXME: publishing should be done in a separate handler so we can continue
+            // parsing the others asynchronously? Useful if we'd publish to multiple locations.
+            let dst_acker = match sink.publish(match_.subject.clone(), msg.payload).await {
+                Ok(maybe_ack) => { maybe_ack },
+                Err(err) => { eprintln!("error on publish(1) of subject {}: {}", match_.subject, err); continue; },
+            };
+            match dst_acker.await { // try acking the dest
+                Ok(_) => { src_acker.ack().await.unwrap(); /* ack the source; FIXME error handling */ },
+                // FIXME: When publish(2) fails, it might be because there is no stream and we
+                // cannot get an ack. Should we auto-create the stream?
+                Err(err) => { eprintln!("error on publish(2) of subject {}: {}", match_.subject, err); break; },
+            }
         }
         let pub_td = pub_t0.elapsed();
 
@@ -168,9 +179,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
         drop(period_stats);
     }
 
-    // FIXME: We get here at least on publish(2)-fail. Not sure
-    // when/if/how input.next().await can fail.
-    eprintln!("FIXME: When do we get out of the iterator loop?");
+    // We break out of the iterator loop on:
+    // - input error (broken connection?)
+    // - explicit 'break' (bad/unexpected data)
+    // - after publish() errors (also explicit break)
 
     let forever_stats = forever_stats_io.lock().expect("Lock forever_stats_io fail");
     let _count = forever_stats.get_count();
@@ -178,7 +190,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     eprintln!("natsomatch shutting down...");
 
-    // XXX: does these work? is this needed?
+    // FIXME: Do these work? Is it needed?
     healthz_task.abort();
     stats_task.abort();
 
