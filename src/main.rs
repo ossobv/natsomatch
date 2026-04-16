@@ -128,59 +128,54 @@ async fn main() -> Result<(), Box<dyn Error>> {
     });
 
     // Start the main task
-    loop {
-        while let Some(Ok(msg)) = input.next().await {
-            // Prepare/parse
-            let prep_t0 = Instant::now();
-            let (msg, src_acker) = msg.split(); // split, so we can steal msg.payload
-            let attrs = match payload_parser::BytesAttributes::from_payload(&msg.payload) {
-                Ok(ok) => { ok },
-                Err(err) => { eprintln!("error decoding payload: {}; {:?}", err, msg.payload); continue; },
-            };
-            let match_ = match log_matcher::Match::from_attributes(&attrs) {
-                Ok(ok) => { ok },
-                Err(err) => { eprintln!("error matching payload: {}; {:?}; {:?}", err, attrs, msg.payload); continue; },
-            };
-            let prep_td = prep_t0.elapsed();
+    while let Some(Ok(msg)) = input.next().await {
+        // Prepare/parse
+        let prep_t0 = Instant::now();
+        let (msg, src_acker) = msg.split(); // split, so we can steal msg.payload
+        let attrs = match payload_parser::BytesAttributes::from_payload(&msg.payload) {
+            Ok(ok) => { ok },
+            Err(err) => { eprintln!("error decoding payload: {}; {:?}", err, msg.payload); continue; },
+        };
+        let match_ = match log_matcher::Match::from_attributes(&attrs) {
+            Ok(ok) => { ok },
+            Err(err) => { eprintln!("error matching payload: {}; {:?}; {:?}", err, attrs, msg.payload); continue; },
+        };
+        let prep_td = prep_t0.elapsed();
 
-            // Publish
-            // FIXME: publishing should be done in a separate handler so we can continue
-            // parsing the others asynchronously? Useful if we'd publish to multiple locations.
-            let pub_t0 = Instant::now();
-            let dst_acker = match sink.publish(match_.subject.clone(), msg.payload).await {
-                Ok(maybe_ack) => { maybe_ack },
-                Err(err) => { eprintln!("error on publish(1) of subject {}: {}", match_.subject, err); continue; },
-            };
-            match dst_acker.await { // try acking the dest
-                Ok(_) => { src_acker.ack().await.unwrap(); /* ack the source; FIXME error handling */ },
-                // FIXME: When publish(2) fails, it might be because there is no stream and we
-                // cannot get an ack. Should we auto-create the stream?
-                Err(err) => { eprintln!("error on publish(2) of subject {}: {}", match_.subject, err); break; },
-            }
-            let pub_td = pub_t0.elapsed();
-
-            // Stats
-            let mut forever_stats = forever_stats_io.lock().expect("Lock forever_stats_io fail");
-            forever_stats.inc(prep_td, pub_td);
-            drop(forever_stats);
-
-            let mut period_stats = period_stats_io.lock().expect("Lock period_stats_io fail");
-            period_stats.inc(prep_td, pub_td);
-            drop(period_stats);
+        // Publish
+        // FIXME: publishing should be done in a separate handler so we can continue
+        // parsing the others asynchronously? Useful if we'd publish to multiple locations.
+        let pub_t0 = Instant::now();
+        let dst_acker = match sink.publish(match_.subject.clone(), msg.payload).await {
+            Ok(maybe_ack) => { maybe_ack },
+            Err(err) => { eprintln!("error on publish(1) of subject {}: {}", match_.subject, err); continue; },
+        };
+        match dst_acker.await { // try acking the dest
+            Ok(_) => { src_acker.ack().await.unwrap(); /* ack the source; FIXME error handling */ },
+            // FIXME: When publish(2) fails, it might be because there is no stream and we
+            // cannot get an ack. Should we auto-create the stream?
+            Err(err) => { eprintln!("error on publish(2) of subject {}: {}", match_.subject, err); break; },
         }
+        let pub_td = pub_t0.elapsed();
 
-        // FIXME: We get here at least on publish(2)-fail. Not sure
-        // when/if/how input.next().await can fail.
-        eprintln!("FIXME: When do we get out of the iterator loop?");
-
-        let forever_stats = forever_stats_io.lock().expect("Lock forever_stats_io fail");
-        let count = forever_stats.get_count();
+        // Stats
+        let mut forever_stats = forever_stats_io.lock().expect("Lock forever_stats_io fail");
+        forever_stats.inc(prep_td, pub_td);
         drop(forever_stats);
-        if count > 0 {  // really just to silence clippy..
-            break;
-        }
 
+        let mut period_stats = period_stats_io.lock().expect("Lock period_stats_io fail");
+        period_stats.inc(prep_td, pub_td);
+        drop(period_stats);
     }
+
+    // FIXME: We get here at least on publish(2)-fail. Not sure
+    // when/if/how input.next().await can fail.
+    eprintln!("FIXME: When do we get out of the iterator loop?");
+
+    let forever_stats = forever_stats_io.lock().expect("Lock forever_stats_io fail");
+    let _count = forever_stats.get_count();
+    drop(forever_stats);
+
     eprintln!("natsomatch shutting down...");
 
     // XXX: does these work? is this needed?
