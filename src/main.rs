@@ -152,6 +152,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
             eprintln!("unexpected subject: {}; ack+abort; {:?}", match_.subject, msg.payload);
             src_acker.ack().await.unwrap();
             break;
+        } else if match_.subject.starts_with("bulk.haproxy.") ||
+                match_.subject.starts_with("bulk.nginx.") {
+            src_acker.ack().await.unwrap();
         } else {
             // Publish
             // FIXME: publishing should be done in a separate handler so we can continue
