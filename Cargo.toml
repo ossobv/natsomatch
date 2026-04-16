@@ -3,7 +3,7 @@
 [package]
 name = "natsomatch"
 edition = "2021"
-version = "0.3.1"
+version = "0.4.0"
 #authors = ["Alice <a@example.com>", "Bob <b@example.com>"]
 
 # https://github.com/johnthagen/min-sized-rust
@@ -24,18 +24,19 @@ name = "bogus"
 harness = false
 
 [dev-dependencies]
-criterion = "0.5"
+criterion = "0.8"
 
 [dependencies]
 natsomatch-json = { path = "lib/json" }
 natsomatch-match = { path = "lib/match" }
 
-async-nats = "0.33"
+async-nats = "0.47"
 bytes = "1"
 git-version = "0.3"
 futures = "0.3"
 http-body-util = "0.1"
 hyper = { version = "1", features = ["full"] }
 hyper-util = { version = "0.1", features = ["full"] }
+# Not upgrading to 1.1 now, because test failure in "config_parser::tests::test_sample".
 toml = "0.8"
 tokio = { version = "1.36", features = ["full"] }

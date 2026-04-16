@@ -3,7 +3,7 @@
 [package]
 name = "natsomatch-json"
 edition = "2021"
-version = "0.3.0"
+version = "0.4.0"
 #authors = ["Alice <a@example.com>", "Bob <b@example.com>"]
 
 # https://github.com/johnthagen/min-sized-rust
