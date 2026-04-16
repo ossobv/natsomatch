@@ -1,41 +1,41 @@
-///
-/// We put some trust in the JSON provided by grafana-agent-flow and
-/// passed along by Vector. Because it should be the same always, we're
-/// confident that we can parse the json blob as a simple string,
-/// instead of going full fledged serde_json on it. This saves us many
-/// precious microseconds.
-///
-/// (1) We expect the {"attributes":{ map to be first. [But this is not
-///     mandatory.]
-/// (2) We expect no excess spaces. [Also not mandatory.]
-/// (3) The fields inside the "attributes" map should have no funny
-///     characters, like "section":"section\"ha, there is more".
-///     [Also not mandatory.]
-/// (4) I don't think you can abuse it enough to spoil other hosts logs,
-///     but you might spoil/break your own log parsing. But if you wanted
-///     to do that, you might as well just stop the grafana-agent.
-///
-/// TODO: Double check that we cannot intentionaly panic the
-/// BytesAttributes parser.
-///
-/// Input payload:
-///
-/// {
-///   "attributes": {
-///     "host": "mgmt.example",
-///     "job": "loki.source.journal.logs_journald_generic",
-///     "observed_time_unix_nano": 1708349372637827462,
-///     "section": "section-dmz-cat4",
-///     "systemd_unit": "session-7889.scope",
-///     "time_unix_nano": 1708349372636882340
-///   },
-///   "dropped_attributes_count": 0,
-///   "message": <900 bytes>,
-///   "observed_timestamp": "2024-02-16T16:46:38.674019861Z",
-///   "source_type": "opentelemetry",
-///   "timestamp": "2024-02-16T16:46:38.323659Z"
-/// }
-///
+//!
+//! We put some trust in the JSON provided by grafana-agent-flow and
+//! passed along by Vector. Because it should be the same always, we're
+//! confident that we can parse the json blob as a simple string,
+//! instead of going full fledged serde_json on it. This saves us many
+//! precious microseconds.
+//!
+//! (1) We expect the {"attributes":{ map to be first. [But this is not
+//!     mandatory.]
+//! (2) We expect no excess spaces. [Also not mandatory.]
+//! (3) The fields inside the "attributes" map should have no funny
+//!     characters, like "section":"section\"ha, there is more".
+//!     [Also not mandatory.]
+//! (4) I don't think you can abuse it enough to spoil other hosts logs,
+//!     but you might spoil/break your own log parsing. But if you wanted
+//!     to do that, you might as well just stop the grafana-agent.
+//!
+//! TODO: Double check that we cannot intentionaly panic the
+//! BytesAttributes parser.
+//!
+//! Input payload:
+//!
+//! {
+//!   "attributes": {
+//!     "host": "mgmt.example",
+//!     "job": "loki.source.journal.logs_journald_generic",
+//!     "observed_time_unix_nano": 1708349372637827462,
+//!     "section": "section-dmz-cat4",
+//!     "systemd_unit": "session-7889.scope",
+//!     "time_unix_nano": 1708349372636882340
+//!   },
+//!   "dropped_attributes_count": 0,
+//!   "message": <900 bytes>,
+//!   "observed_timestamp": "2024-02-16T16:46:38.674019861Z",
+//!   "source_type": "opentelemetry",
+//!   "timestamp": "2024-02-16T16:46:38.323659Z"
+//! }
+//!
 
 
 ///
@@ -81,7 +81,7 @@ pub struct StringAttributes {
 
 
 impl<'a> BytesAttributes<'a> {
-    pub fn from_payload(payload: &'a [u8]) -> Result<BytesAttributes, &str> {
+    pub fn from_payload(payload: &'a [u8]) -> Result<BytesAttributes<'a>, &'a str> {
         Self::consume_special_root(payload)
     }
 
@@ -94,7 +94,7 @@ impl<'a> BytesAttributes<'a> {
     }
 
     /// Parse the entire payload.
-    fn consume_special_root(payload: &'a [u8]) -> Result<BytesAttributes, &str> {
+    fn consume_special_root(payload: &'a [u8]) -> Result<BytesAttributes<'a>, &'a str> {
         let mut bingo: u32 = 0; // 1(attributes) + 2(message)
 
         let mut partial = BytesAttributes {
@@ -243,10 +243,10 @@ impl<'a> BytesAttributes<'a> {
         //println!("[consume_value]");
         let ch = Self::skip_whitespace(payload, i)?;
         match ch {
-            b'{' => { return Self::consume_dict(payload, i);  },
-            b'[' => { return Self::consume_list(payload, i); },
-            b'"' => { return Self::consume_string(payload, i); },
-            _ => { return Self::consume_other(payload, i); },
+            b'{' => { Self::consume_dict(payload, i)  },
+            b'[' => { Self::consume_list(payload, i) },
+            b'"' => { Self::consume_string(payload, i) },
+            _ => { Self::consume_other(payload, i) },
         }
     }
 

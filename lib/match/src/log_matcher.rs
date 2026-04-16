@@ -1,13 +1,13 @@
-///
-/// This matches log messages that are passed from journald/files
-/// through Grafana Alloy (or flow) and sets the following subject:
-///   bulk.{match}.{tenant}.{section}.{hostname}
-/// where hostname has the dots replaced with hyphens.
-///
-/// The NATS recipient has to ensure that these subject have valid
-/// listeners, otherwise waiting for an ack on publish will fail:
-///   error on publish(2) of subject <S>: timed out: didn't receive ack in time
-///
+//!
+//! This matches log messages that are passed from journald/files
+//! through Grafana Alloy (or flow) and sets the following subject:
+//!   bulk.{match}.{tenant}.{section}.{hostname}
+//! where hostname has the dots replaced with hyphens.
+//!
+//! The NATS recipient has to ensure that these subject have valid
+//! listeners, otherwise waiting for an ack on publish will fail:
+//!   error on publish(2) of subject <S>: timed out: didn't receive ack in time
+//!
 
 use natsomatch_json::payload_parser::BytesAttributes;
 
