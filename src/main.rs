@@ -185,10 +185,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // - after publish() errors (also explicit break)
 
     let forever_stats = forever_stats_io.lock().expect("Lock forever_stats_io fail");
-    let _count = forever_stats.get_count();
+    let count = forever_stats.get_count();
     drop(forever_stats);
 
-    eprintln!("natsomatch shutting down...");
+    eprintln!("natsomatch shutting down... ({} handled)", count);
 
     // FIXME: Do these work? Is it needed?
     healthz_task.abort();
