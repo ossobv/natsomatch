@@ -17,8 +17,8 @@ StreamInfo = namedtuple('StreamInfo', 'description')
 EXPECTED_STREAMS = {
     'standard_events': StreamInfo('Post-processed events, including security events'),
 
-    'bulk_match_apache2': StreamInfo('Apache2 webserver logs'),
     'bulk_match_aide': StreamInfo('AIDE changed files monitoring'),
+    'bulk_match_apache2': StreamInfo('Apache2 webserver logs'),
     'bulk_match_audit': StreamInfo('Misc. auditd/pam logging'),
     'bulk_match_cron': StreamInfo('Misc. cron logging'),
     'bulk_match_devinfra': StreamInfo('Git/CI/CD workflow'),
@@ -29,6 +29,7 @@ EXPECTED_STREAMS = {
     'bulk_match_hids': StreamInfo('Anti-virus (ClamAV) logs'),
     'bulk_match_k8s': StreamInfo('Kubernetes logs'),
     'bulk_match_k8s-audit': StreamInfo('Kubernetes audit logs'),
+    'bulk_match_kubescape': StreamInfo('Kubescape logs'),
     'bulk_match_mail': StreamInfo('Postfix/Exim/helpers'),
     'bulk_match_monitoring': StreamInfo('Gocollect/Zabbix logs'),
     'bulk_match_nginx': StreamInfo('nginx requests/logs'),
@@ -41,6 +42,7 @@ EXPECTED_STREAMS = {
     'bulk_match_uwsgi': StreamInfo('uWSGI webserver logs'),
     'bulk_match_v12n': StreamInfo('containerd/docker logs'),
     'bulk_match_vault': StreamInfo('Vault logs'),
+    'bulk_match_vpn': StreamInfo('VPN logs'),
 
     'bulk_unfiltered': StreamInfo('Input'),
 

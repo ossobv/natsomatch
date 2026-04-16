@@ -140,6 +140,13 @@ impl Match {
             });
         }
 
+        if starts_with(attrs.filename, b"/var/log/pods/kubescape_node-agent") {
+            return Ok(Match {
+                // destination: "bulk_match_kubescape",
+                subject: format!("bulk.kubescape.{tenant}.{section}.{hostname}"),
+            });
+        }
+
         if starts_with(attrs.filename, b"/var/log/redis/") {
             return Ok(Match {
                 // destination: "bulk_match_redis",
