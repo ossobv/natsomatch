@@ -107,6 +107,13 @@ impl Match {
             });
         }
 
+        if starts_with(attrs.filename, b"/var/log/pods/kube-falco_falco-") {
+            return Ok(Match {
+                // destination: "bulk_match_falco",
+                subject: format!("bulk.falco.{tenant}.{section}.{hostname}"),
+            });
+        }
+
         if attrs.systemd_unit == b"postfix@-.service" ||
                 attrs.systemd_unit == b"postfix.service" ||
                 attrs.systemd_unit == b"opendkim.service" ||

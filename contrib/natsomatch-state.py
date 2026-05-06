@@ -24,6 +24,7 @@ EXPECTED_STREAMS = {
     'bulk_match_devinfra': StreamInfo('Git/CI/CD workflow'),
     'bulk_match_etcd': StreamInfo('etcd logs'),
     'bulk_match_execve': StreamInfo('Monitoring execve() calls'),
+    'bulk_match_falco': StreamInfo('Falco logs'),
     'bulk_match_firewall': StreamInfo('Kernel iptables output'),
     'bulk_match_haproxy': StreamInfo('Haproxy requests/logs'),
     'bulk_match_hids': StreamInfo('Anti-virus (ClamAV) logs'),
