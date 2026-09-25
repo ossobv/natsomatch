@@ -107,7 +107,8 @@ impl Match {
             });
         }
 
-        if starts_with(attrs.filename, b"/var/log/pods/kube-falco_falco-") {
+        // Filename is overwritten in alloy to remove UUID.
+        if attrs.filename == b"/var/log/pods/kube-falco_falco/falco.log" {
             return Ok(Match {
                 // destination: "bulk_match_falco",
                 subject: format!("bulk.falco.{tenant}.{section}.{hostname}"),
