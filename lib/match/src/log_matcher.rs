@@ -325,7 +325,8 @@ impl Match {
 
         if attrs.systemd_unit == b"osso-node-ready.service" ||
                 attrs.systemd_unit == b"osso-perform-updates.path" ||
-                attrs.systemd_unit == b"osso-updates-needed.timer" {
+                attrs.systemd_unit == b"osso-updates-needed.timer" ||
+                attrs.filename == b"/var/log/pods/kube-system_kured/kured/kured.log" {
             return Ok(Match {
                 // destination: "bulk_match_maintenance",
                 subject: format!("bulk.maintenance.{tenant}.{section}.{hostname}"),
