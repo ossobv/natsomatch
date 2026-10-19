@@ -312,6 +312,12 @@ impl Match {
                         subject: format!("bulk.execve.{tenant}.{section}.{hostname}"),
                     });
                 }
+                if memmem(attrs.message, br#"\"SYSLOG_IDENTIFIER\":\"vetted-modprobe\""#).is_some() {
+                    return Ok(Match {
+                        // destination: "bulk_match_hids",
+                        subject: format!("bulk.hids.{tenant}.{section}.{hostname}"),
+                    });
+                }
             }
         }
 
