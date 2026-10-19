@@ -43,7 +43,7 @@ category and create new subjects.
       MATCHES=$(cat lib/match/src/log_matcher.rs |
                 grep -FA2 'Ok(Match' |
                 sed -e '/subject: /!d;s/.*format!("bulk[.]//;s/[.].*//' |
-                sort)
+                sort -u)
 
       for match in $MATCHES; do
 
