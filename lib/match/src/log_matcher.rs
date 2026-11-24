@@ -329,7 +329,8 @@ impl Match {
             });
         }
 
-        if attrs.systemd_unit == b"osso-node-ready.service" ||
+        if attrs.systemd_unit == b"osso-automaint-controller.service" ||
+                attrs.systemd_unit == b"osso-node-ready.service" ||
                 attrs.systemd_unit == b"osso-perform-updates.path" ||
                 attrs.systemd_unit == b"osso-updates-needed.timer" ||
                 attrs.filename == b"/var/log/pods/kube-system_kured/kured/kured.log" {
